@@ -1,32 +1,11 @@
 {
-  "storage": {
-    "input": {
-      "files": [],
-      "tables": [
-        {
-          "source": "in.c-test.test",
-          "destination": "test.csv",
-          "limit": 50,
-          "columns": [],
-          "where_values": [],
-          "where_operator": "eq"
-        }
-      ]
-    },
-    "output": {
-      "files": [],
-      "tables": []
-    }
-  },
   "parameters": {
-    "#api_token": "demo",
-    "print_hello": true,
+    "client_id": "",
+    "#client_secret": "",
+    "tenant_id": "6f4e5157-b94d-4dd1-b1d6-ef945bda7cd7",
     "debug": true
   },
   "action":"run",
-  "image_parameters": {
-    "syrup_url": "https://syrup.keboola.com/"
-  },
   "authorization": {
     "oauth_api": {
       "id": "OAUTH_API_ID",
