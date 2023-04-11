@@ -16,7 +16,7 @@
       "default": "work_school",
       "options": {
         "enum_titles": [
-          "Private",
+          "Private/Personal",
           "Work/School"
         ]
       },

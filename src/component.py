@@ -11,6 +11,7 @@ KEY_TENANT_ID = 'tenant_id'
 KEY_SITE_NAME = 'site_name'
 KEY_FOLDER = 'folder'
 KEY_MASK = 'mask'
+KEY_ACCOUNT_TYPE = 'account_type'
 
 # list of mandatory parameters => if some is missing,
 # component will fail with readable message on initialization.
@@ -46,15 +47,16 @@ class Component(ComponentBase):
         folder = params.get(KEY_FOLDER, "/") or "/"
         mask = params.get(KEY_MASK, "*") or "*"
 
-        client = self.get_client()
+        account_type = self.configuration.parameters.get("account_type")
+        client = self.get_client(account_type)
         logging.info(f"Component will download files from folder: {folder} with mask: {mask}")
         client.download_files(folder_path=folder, file_mask=mask, output_dir=self.files_out_path)
 
-    def get_client(self):
-        if self.authorized_for == "personal OD":
+    def get_client(self, account_type):
+        if account_type == "private":
             client = OneDriveClient(refresh_token=self.refresh_token, files_out_folder=self.files_out_path,
                                     client_id=self.client_id, client_secret=self.client_secret)
-        else:
+        elif account_type == "work_school":
             tenant_id = self.configuration.parameters.get(KEY_TENANT_ID)
             site_name = self.configuration.parameters.get(KEY_SITE_NAME)
             logging.info(f"Site name set to {site_name}")
@@ -65,6 +67,8 @@ class Component(ComponentBase):
                                             client_secret=self.client_secret,
                                             tenant_id=tenant_id,
                                             site_name=site_name)
+        else:
+            raise UserException(f"Unsupported Account Type: {account_type}")
         return client
 
 
