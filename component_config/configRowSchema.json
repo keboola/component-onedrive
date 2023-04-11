@@ -31,7 +31,8 @@
         "dependencies": {
           "account_type": "work_school"
         }
-      }
+      },
+      "propertyOrder": 2
     },
     "site_name": {
       "type": "string",
@@ -42,7 +43,18 @@
         "dependencies": {
           "account_type": "work_school"
         }
-      }
+      },
+      "propertyOrder": 3
+    },
+    "folder": {
+      "type": "string",
+      "title": "Folder",
+      "propertyOrder": 4
+    },
+    "mask": {
+      "type": "string",
+      "title": "Mask",
+      "propertyOrder": 5
     }
   }
 }
