@@ -13,36 +13,36 @@
         "private",
         "work_school"
       ],
-      "default": "Work/School",
+      "default": "work_school",
       "options": {
-            "enum_titles": [
-              "Private",
-              "Work/School"
-            ]
-          },
+        "enum_titles": [
+          "Private",
+          "Work/School"
+        ]
+      },
       "propertyOrder": 1
-    }
-  },
-  "tenant_id": {
+    },
+    "tenant_id": {
       "type": "string",
       "title": "Tenant ID",
       "required": true,
+      "description": "You can find the Tenant ID in the <a href='https://portal.azure.com/#home'>Azure Portal</a>. After signing in, click on 'Azure Active Directory' in the left-hand menu. The Tenant ID can be found in the 'Tenant information' section on the 'Azure Active Directory' overview page.",
       "options": {
-          "dependencies": {
-              "account_type": "work_school"
-          }
-      },
-      "description": "You can find the Tenant ID in the <a href='https://portal.azure.com/#home'>Azure Portal</a>. After signing in, click on 'Azure Active Directory' in the left-hand menu. The Tenant ID can be found in the 'Tenant information' section on the 'Azure Active Directory' overview page."
-  },
-    "site_name": {
-    "type": "string",
-    "title": "Site Name",
-    "required": true,
-    "options": {
-      "dependencies": {
-        "account_type": "work_school"
+        "dependencies": {
+          "account_type": "work_school"
+        }
       }
     },
-      "description": "You can find the site name in the url address when you visit your SharePoint or OneDrive for Business."
+    "site_name": {
+      "type": "string",
+      "title": "Site Name",
+      "required": true,
+      "description": "You can find the site name in the url address when you visit your SharePoint or OneDrive for Business.",
+      "options": {
+        "dependencies": {
+          "account_type": "work_school"
+        }
+      }
+    }
   }
 }
