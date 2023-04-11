@@ -15,7 +15,7 @@ KEY_ACCOUNT_TYPE = 'account_type'
 
 # list of mandatory parameters => if some is missing,
 # component will fail with readable message on initialization.
-REQUIRED_PARAMETERS = []
+REQUIRED_PARAMETERS = [KEY_ACCOUNT_TYPE]
 REQUIRED_IMAGE_PARS = []
 
 
