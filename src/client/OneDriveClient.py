@@ -97,7 +97,7 @@ class OneDriveClient:
 
         if response.status_code == 200:
             with open(output_path, "wb") as f:
-                for chunk in response.iter_content(chunk_size=8192):
+                for chunk in response.iter_content(chunk_size=32768):
                     f.write(chunk)
             logging.info(f"File downloaded to {output_path}")
         else:
