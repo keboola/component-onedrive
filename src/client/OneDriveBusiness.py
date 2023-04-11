@@ -1,22 +1,23 @@
 import requests
+import json
 import logging
+import os
 from msal import ConfidentialClientApplication
 import fnmatch
-import os
 
 
-class OneDriveClientException(Exception):
+class OneDriveBusinessClientException(Exception):
     pass
 
 
-class OneDriveClient:
-    def __init__(self, refresh_token, files_out_folder, client_id, client_secret):
+class OneDriveBusinessClient:
+    def __init__(self, refresh_token, files_out_folder, client_id, client_secret, tenant_id, site_name):
         self.files_out_folder = files_out_folder
         self.refresh_token = refresh_token
         self.access_token = None
-        self.endpoint = 'https://graph.microsoft.com/v1.0/me'
-        self.authority = f'https://login.microsoftonline.com/common'
-        self.scope = ['https://graph.microsoft.com/User.Read', 'https://graph.microsoft.com/Files.Read.All']
+        self.tenant_id = tenant_id
+        self.authority = f'https://login.microsoftonline.com/{tenant_id}'
+        self.scope = 'https://graph.microsoft.com/Sites.Read.All https://graph.microsoft.com/Files.Read.All'
         self.client_id = client_id
         self.client_secret = client_secret
 
@@ -26,9 +27,12 @@ class OneDriveClient:
         )
 
         self.get_access_token(refresh_token=refresh_token)
+        self.site_id, self.site_url = self.get_site_id_and_url(site_name)
+        self.endpoint = f'https://graph.microsoft.com/v1.0/sites/{self.site_id}'
 
     def get_access_token(self, refresh_token: str):
         if self.access_token:
+            # check if access token is present and valid
             headers = {'Authorization': f'Bearer {self.access_token}'}
             response = requests.get(self.endpoint, headers=headers)
             if response.status_code == 200:
@@ -51,19 +55,9 @@ class OneDriveClient:
         token = response.json().get("access_token", None)
         if not token:
             logging.error(response.json())
-            raise OneDriveClientException("Cannot fetch Access token")
+            raise OneDriveBusinessClientException("Cannot fetch Access token")
         logging.info("Access token fetched")
         self.access_token = response.json()["access_token"]
-
-    def list_users(self):
-        endpoint = 'https://graph.microsoft.com/v1.0/users'
-        headers = {'Authorization': f'Bearer {self.access_token}'}
-        response = requests.get(endpoint, headers=headers)
-        if response.status_code == 200:
-            users = response.json()['value']
-            return users
-        else:
-            raise Exception(f"Error occured when listing users: {response.status_code}, {response.text}")
 
     def list_folder_contents(self, folder_path=None):
         if folder_path is None or folder_path == '/':
@@ -88,8 +82,8 @@ class OneDriveClient:
             items = response.json()['value']
             return items
         else:
-            raise OneDriveClientException(f"Error occurred when getting folder content:"
-                                          f" {response.status_code}, {response.text}")
+            raise OneDriveBusinessClientException(f"Error occurred when getting folder content:"
+                                                  f" {response.status_code}, {response.text}")
 
     def download_file_from_onedrive_url(self, url, output_path):
         headers = {"Authorization": f"Bearer {self.access_token}"}
@@ -103,7 +97,7 @@ class OneDriveClient:
         else:
             raise Exception(f"Error downloading file: {response.status_code}, {response.text}")
 
-    def download_files(self, folder_path, output_dir, file_mask="*"):
+    def download_files(self, folder_path, file_mask, output_dir):
         items = self.list_folder_contents(folder_path)
 
         for item in items:
@@ -120,4 +114,21 @@ class OneDriveClient:
                 else:
                     subfolder_path = f"{folder_path}/{item['name']}"
                 self.download_files(subfolder_path, file_mask, output_dir)
+
+    def get_site_id_and_url(self, site_name):
+        search_url = f"https://graph.microsoft.com/v1.0/sites?search={site_name}"
+        headers = {'Authorization': f'Bearer {self.access_token}'}
+        response = requests.get(search_url, headers=headers)
+        if response.status_code == 200:
+            sites = response.json()['value']
+            if len(sites) > 0:
+                site = sites[0]  # Assuming the first result is the desired site
+                site_id = site['id']
+                site_url = site['webUrl']
+                return site_id, site_url
+            else:
+                raise OneDriveBusinessClientException("No site found with the given name")
+        else:
+            raise OneDriveBusinessClientException(f"Error occurred when searching for the site:"
+                                                  f" {response.status_code}, {response.text}")
 

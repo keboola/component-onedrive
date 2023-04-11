@@ -1,1 +1,41 @@
-{}
+{
+  "type": "object",
+  "title": "extractor configuration",
+  "required": [
+    "account_type"
+  ],
+  "properties": {
+    "account_type": {
+      "type": "string",
+      "title": "Account Type",
+      "required": true,
+      "enum": [
+        "Private",
+        "Work/School"
+      ],
+      "propertyOrder": 1
+    }
+  },
+  "tenant_id": {
+      "type": "string",
+      "title": "Tenant ID",
+      "required": true,
+      "options": {
+          "dependencies": {
+              "account_type": "Work/School"
+          }
+      },
+      "description": "You can find the Tenant ID in the <a href='https://portal.azure.com/#home'>Azure Portal</a>. After signing in, click on 'Azure Active Directory' in the left-hand menu. The Tenant ID can be found in the 'Tenant information' section on the 'Azure Active Directory' overview page."
+  },
+    "site_name": {
+    "type": "string",
+    "title": "Site Name",
+    "required": true,
+    "options": {
+      "dependencies": {
+        "account_type": "Work/School"
+      }
+    },
+      "description": "You can find the site name in the url address when you visit your SharePoint or OneDrive for Business."
+  }
+}
