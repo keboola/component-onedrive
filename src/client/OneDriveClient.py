@@ -15,7 +15,7 @@ class OneDriveClient:
         self.refresh_token = refresh_token
         self.access_token = None
         self.endpoint = 'https://graph.microsoft.com/v1.0/me'
-        self.authority = f'https://login.microsoftonline.com/common'
+        self.authority = 'https://login.microsoftonline.com/common'
         self.scope = ['https://graph.microsoft.com/User.Read', 'https://graph.microsoft.com/Files.Read.All']
         self.client_id = client_id
         self.client_secret = client_secret
@@ -120,4 +120,3 @@ class OneDriveClient:
                 else:
                     subfolder_path = f"{folder_path}/{item['name']}"
                 self.download_files(subfolder_path, file_mask, output_dir)
-

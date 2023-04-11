@@ -1,5 +1,4 @@
 import requests
-import json
 import logging
 import os
 from msal import ConfidentialClientApplication
@@ -131,4 +130,3 @@ class OneDriveBusinessClient:
         else:
             raise OneDriveBusinessClientException(f"Error occurred when searching for the site:"
                                                   f" {response.status_code}, {response.text}")
-
