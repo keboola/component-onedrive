@@ -3,12 +3,15 @@ import logging
 from keboola.component.base import ComponentBase
 from keboola.component.exceptions import UserException
 
-from client.onedrive import OneDriveClient
+from client.SharePointClient import SharePointClient
+from client.OneDriveClient import OneDriveClient
 
 # configuration variables
 KEY_CLIENT_ID = 'client_id'
 KEY_CLIENT_SECRET = '#client_secret'
 KEY_TENANT_ID = 'tenant_id'
+KEY_USER_ID = 'user_id'
+KEY_SITE_URL = 'site_url'
 
 # list of mandatory parameters => if some is missing,
 # component will fail with readable message on initialization.
@@ -40,8 +43,15 @@ class Component(ComponentBase):
         client_secret = params.get(KEY_CLIENT_SECRET)
         tenant_id = params.get(KEY_TENANT_ID)
 
-        client = OneDriveClient(client_id, client_secret, tenant_id)
-        client.acquire_token()
+        user_id = params.get(KEY_USER_ID, None)
+        site_url = params.get(KEY_SITE_URL, None)
+
+        if user_id:
+            client = OneDriveClient(client_id, client_secret, user_id)
+        elif site_url:
+            client = SharePointClient(client_id, client_secret, tenant_id, site_url)
+        else:
+            raise UserException("user_id or site_url must be specified in config")
 
 
 """

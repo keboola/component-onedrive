@@ -1,17 +1,15 @@
 import requests
 from msal import ConfidentialClientApplication
-import logging
-import json
 
 
-class OneDriveClient:
-    def __init__(self, client_id, client_secret, tenant_id):
+class SharePointClient:
+    def __init__(self, client_id, client_secret, tenant_id, site_url):
         self.client_id = client_id
         self.client_secret = client_secret
         self.tenant_id = tenant_id
         self.authority = f'https://login.microsoftonline.com/{tenant_id}'
         self.scope = ['https://graph.microsoft.com/.default']
-        self.endpoint = 'https://graph.microsoft.com/v1.0/users'
+        self.site_url = site_url
 
         self.app = ConfidentialClientApplication(
             client_id=self.client_id, authority=self.authority,
@@ -22,33 +20,28 @@ class OneDriveClient:
         result = self.app.acquire_token_silent(self.scope, account=None)
 
         if not result:
-            logging.info("No suitable token exists in cache. Let's get a new one from AAD.")
             result = self.app.acquire_token_for_client(scopes=self.scope)
 
         if "access_token" in result:
-            # Calling graph using the access token
-            graph_data = requests.get(  # Use token to call downstream service
-                self.endpoint,
-                headers={'Authorization': 'Bearer ' + result['access_token']}, ).json()
-            print("Graph API call result: %s" % json.dumps(graph_data, indent=2))
+            return result['access_token']
+        else:
+            raise Exception("Error acquiring token: ", result.get("error"))
 
-    def list_folder_contents(self, folder_id=None):
+    def list_files(self, folder_server_relative_url):
         token = self.acquire_token()
-        folder_path = f"{self.endpoint}/root/children" if folder_id is None else \
-            f"{self.endpoint}/items/{folder_id}/children"
-
-        headers = {'Authorization': f'Bearer {token}'}
-        response = requests.get(folder_path, headers=headers)
+        endpoint = f"{self.site_url}/_api/web/GetFolderByServerRelativeUrl('{folder_server_relative_url}')/Files"
+        headers = {'Authorization': f'Bearer {token}', 'Accept': 'application/json;odata=verbose'}
+        response = requests.get(endpoint, headers=headers)
 
         if response.status_code == 200:
-            items = response.json()['value']
-            return items
+            files = response.json()['d']['results']
+            return files
         else:
             raise Exception(f"Error: {response.status_code}, {response.text}")
 
-    def download_file(self, item_id, local_path):
+    def download_file(self, relative_path, local_path):
         token = self.acquire_token()
-        download_url = f"{self.endpoint}/items/{item_id}/content"
+        download_url = f"{self.site_url}/_api/web/GetFileByServerRelativePath(decodedurl='{relative_path}')/$value"
         headers = {'Authorization': f'Bearer {token}'}
         response = requests.get(download_url, headers=headers, stream=True)
 
