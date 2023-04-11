@@ -45,6 +45,8 @@ class Component(ComponentBase):
         self.validate_image_parameters(REQUIRED_IMAGE_PARS)
         params = self.configuration.parameters
         folder = params.get(KEY_FOLDER, "/") or "/"
+        if not folder.startswith("/"):
+            folder = "/"+folder
         mask = params.get(KEY_MASK, "*") or "*"
 
         account_type = self.configuration.parameters.get("account_type")
