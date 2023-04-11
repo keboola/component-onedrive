@@ -48,12 +48,14 @@
     },
     "folder": {
       "type": "string",
-      "title": "Folder",
-      "propertyOrder": 4
+      "title": "Folder (optional)",
+      "propertyOrder": 4,
+      "description": "Folder to download the files from."
     },
     "mask": {
       "type": "string",
-      "title": "Mask",
+      "title": "Mask (optional)",
+      "description": "Enter filenames mask.",
       "propertyOrder": 5
     }
   }
