@@ -26,7 +26,7 @@ class Component(ComponentBase):
         For easier debugging the data folder is picked up by default from `../data` path,
         relative to working directory.
 
-        If `debug` parameter is present in the `config_personal.json`, the default logger is set to verbose DEBUG mode.
+        If `debug` parameter is present in the `config.json`, the default logger is set to verbose DEBUG mode.
     """
 
     def __init__(self):
@@ -43,8 +43,8 @@ class Component(ComponentBase):
         self.validate_configuration_parameters(REQUIRED_PARAMETERS)
         self.validate_image_parameters(REQUIRED_IMAGE_PARS)
         params = self.configuration.parameters
-        folder = params.get(KEY_FOLDER, "/")
-        mask = params.get(KEY_MASK, "*")
+        folder = params.get(KEY_FOLDER, "/") or "/"
+        mask = params.get(KEY_MASK, "*") or "*"
 
         client = self.get_client()
         logging.info(f"Component will download files from folder: {folder} with mask: {mask}")
