@@ -107,7 +107,7 @@ class OneDriveBusinessClient:
                     output_path = os.path.join(output_dir, item['name'])
                     self.download_file_from_onedrive_url(file_url, output_path)
 
-            elif item['folder'] is not None:
+            elif item.get('folder') is not None:
                 if folder_path == "/":
                     subfolder_path = f"{folder_path}{item['name']}"
                 else:
