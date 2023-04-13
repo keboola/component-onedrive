@@ -105,7 +105,7 @@ class OneDriveClient:
             raise Exception(f"Error downloading file: {response.status_code}, {response.text}")
 
         if filename in self.downloaded_files:
-            filename = filename + "a"
+            logging.warning(f"File {filename} has the same as an already downloaded file. It will be overwritten.")
         self.downloaded_files.append(filename)
 
     def download_files(self, folder_path, output_dir, file_mask="*"):
