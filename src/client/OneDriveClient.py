@@ -26,6 +26,7 @@ class OneDriveClient:
         )
 
         self.get_access_token(refresh_token=refresh_token)
+        self.downloaded_files = []
 
     def get_access_token(self, refresh_token: str):
         if self.access_token:
@@ -91,7 +92,7 @@ class OneDriveClient:
             raise OneDriveClientException(f"Error occurred when getting folder content:"
                                           f" {response.status_code}, {response.text}")
 
-    def download_file_from_onedrive_url(self, url, output_path):
+    def download_file_from_onedrive_url(self, url, output_path, filename):
         headers = {"Authorization": f"Bearer {self.access_token}"}
         response = requests.get(url, headers=headers, stream=True)
 
@@ -103,19 +104,24 @@ class OneDriveClient:
         else:
             raise Exception(f"Error downloading file: {response.status_code}, {response.text}")
 
+        if filename in self.downloaded_files:
+            filename = filename + "a"
+        self.downloaded_files.append(filename)
+
     def download_files(self, folder_path, output_dir, file_mask="*"):
         items = self.list_folder_contents(folder_path)
         for item in items:
+            # logging.info(item["name"])
             if item.get('file') is not None:
                 if fnmatch.fnmatch(item['name'], file_mask):
                     logging.info(f"Downloading file {item['name']} ...")
                     file_url = item['@microsoft.graph.downloadUrl']
                     output_path = os.path.join(output_dir, item['name'])
-                    self.download_file_from_onedrive_url(file_url, output_path)
+                    self.download_file_from_onedrive_url(file_url, output_path, filename=item["name"])
 
             elif item.get('folder') is not None:
                 if folder_path == "/":
                     subfolder_path = f"{folder_path}{item['name']}"
                 else:
                     subfolder_path = f"{folder_path}/{item['name']}"
-                self.download_files(subfolder_path, file_mask, output_dir)
+                self.download_files(subfolder_path, output_dir, file_mask)
