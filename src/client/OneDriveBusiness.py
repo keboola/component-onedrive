@@ -28,6 +28,7 @@ class OneDriveBusinessClient:
         self.get_access_token(refresh_token=refresh_token)
         self.site_id, self.site_url = self.get_site_id_and_url(site_name)
         self.endpoint = f'https://graph.microsoft.com/v1.0/sites/{self.site_id}'
+        self.downloaded_files = []
 
     def get_access_token(self, refresh_token: str):
         if self.access_token:
@@ -84,7 +85,7 @@ class OneDriveBusinessClient:
             raise OneDriveBusinessClientException(f"Error occurred when getting folder content:"
                                                   f" {response.status_code}, {response.text}")
 
-    def download_file_from_onedrive_url(self, url, output_path):
+    def download_file_from_onedrive_url(self, url, output_path, filename):
         headers = {"Authorization": f"Bearer {self.access_token}"}
         response = requests.get(url, headers=headers, stream=True)
 
@@ -96,6 +97,8 @@ class OneDriveBusinessClient:
         else:
             raise Exception(f"Error downloading file: {response.status_code}, {response.text}")
 
+        self.downloaded_files.append(filename)
+
     def download_files(self, folder_path, file_mask, output_dir):
         items = self.list_folder_contents(folder_path)
 
@@ -105,7 +108,7 @@ class OneDriveBusinessClient:
                     logging.info(f"Downloading file {item['name']} ...")
                     file_url = item['@microsoft.graph.downloadUrl']
                     output_path = os.path.join(output_dir, item['name'])
-                    self.download_file_from_onedrive_url(file_url, output_path)
+                    self.download_file_from_onedrive_url(file_url, output_path, item['name'])
 
             elif item.get('folder') is not None:
                 if folder_path == "/":

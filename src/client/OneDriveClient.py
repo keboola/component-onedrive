@@ -100,7 +100,7 @@ class OneDriveClient:
             with open(output_path, "wb") as f:
                 for chunk in response.iter_content(chunk_size=32768):
                     f.write(chunk)
-            logging.info(f"File downloaded to {output_path}")
+            logging.info(f"File {filename} downloaded.")
         else:
             raise Exception(f"Error downloading file: {response.status_code}, {response.text}")
 

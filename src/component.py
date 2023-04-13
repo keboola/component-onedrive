@@ -1,34 +1,23 @@
 import logging
-
 from keboola.component.base import ComponentBase
 from keboola.component.exceptions import UserException
-
 from client.OneDriveBusiness import OneDriveBusinessClient
 from client.OneDriveClient import OneDriveClient
 
-# configuration variables
+# Configuration variables
 KEY_TENANT_ID = 'tenant_id'
 KEY_SITE_NAME = 'site_name'
 KEY_FOLDER = 'folder'
 KEY_MASK = 'mask'
 KEY_ACCOUNT_TYPE = 'account_type'
+KEY_CUSTOM_TAG = 'custom_tag'
 
-# list of mandatory parameters => if some is missing,
-# component will fail with readable message on initialization.
+# List of required parameters
 REQUIRED_PARAMETERS = [KEY_ACCOUNT_TYPE]
 REQUIRED_IMAGE_PARS = []
 
 
 class Component(ComponentBase):
-    """
-        Extends base class for general Python components. Initializes the CommonInterface
-        and performs configuration validation.
-
-        For easier debugging the data folder is picked up by default from `../data` path,
-        relative to working directory.
-
-        If `debug` parameter is present in the `config.json`, the default logger is set to verbose DEBUG mode.
-    """
 
     def __init__(self):
         super().__init__()
@@ -40,7 +29,6 @@ class Component(ComponentBase):
         )
 
     def run(self):
-
         self.validate_configuration_parameters(REQUIRED_PARAMETERS)
         self.validate_image_parameters(REQUIRED_IMAGE_PARS)
         params = self.configuration.parameters
@@ -48,11 +36,17 @@ class Component(ComponentBase):
         if not folder.startswith("/"):
             folder = "/"+folder
         mask = params.get(KEY_MASK, "*") or "*"
+        tag = params.get(KEY_CUSTOM_TAG, False)
+        tags = [tag] if tag else []
 
         account_type = self.configuration.parameters.get("account_type")
         client = self.get_client(account_type)
         logging.info(f"Component will download files from folder: {folder} with mask: {mask}")
         client.download_files(folder_path=folder, file_mask=mask, output_dir=self.files_out_path)
+
+        for filename in client.downloaded_files:
+            file_def = self.create_out_file_definition(filename, tags=tags)
+            self.write_manifest(file_def)
 
     def get_client(self, account_type):
         if account_type == "private":
@@ -74,13 +68,10 @@ class Component(ComponentBase):
         return client
 
 
-"""
-        Main entrypoint
-"""
+# Main entrypoint
 if __name__ == "__main__":
     try:
         comp = Component()
-        # this triggers the run method by default and is controlled by the configuration.action parameter
         comp.execute_action()
     except UserException as exc:
         logging.exception(exc)

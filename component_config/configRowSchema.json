@@ -50,12 +50,18 @@
       "type": "string",
       "title": "Folder (optional)",
       "propertyOrder": 4,
-      "description": "Folder to download the files from."
+      "description": "Folder to search and download the files from."
     },
     "mask": {
       "type": "string",
       "title": "Mask (optional)",
       "description": "Enter filenames mask.",
+      "propertyOrder": 5
+    },
+    "custom_tag": {
+      "type": "string",
+      "title": "Custom Tag (optional)",
+      "description": "Adds custom tag to Keboola Storage for all downloaded files.",
       "propertyOrder": 5
     }
   }
