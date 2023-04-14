@@ -61,6 +61,7 @@
     "last_modified_at": {
       "type": "string",
       "title": "Last Modified At (optional)",
+      "default": "last run",
       "description": "Date from which data is downloaded. Either date in YYYY-MM-DD format or dateparser string i.e. 5 days ago, 1 month ago, yesterday, etc. You can also set this as last run, which will fetch data from the last run of the component.",
       "propertyOrder": 5
     },
