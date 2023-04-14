@@ -117,6 +117,7 @@ class OneDriveBusinessClient:
             raise OneDriveBusinessClientException(f"Error occurred when searching for the site:"
                                                   f" {response.status_code}, {response.text}")
 
+
 def download_files(self, folder_path, file_mask="*", output_dir=None, last_updated_at=None):
     """
     Downloads files from a SharePoint folder to a local directory.
