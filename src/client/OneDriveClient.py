@@ -3,6 +3,7 @@ import logging
 from msal import ConfidentialClientApplication
 import fnmatch
 import os
+from datetime import datetime
 
 
 class OneDriveClientException(Exception):
@@ -108,12 +109,38 @@ class OneDriveClient:
             logging.warning(f"File {filename} has the same as an already downloaded file. It will be overwritten.")
         self.downloaded_files.append(filename)
 
-    def download_files(self, folder_path, output_dir, file_mask="*"):
+    def download_files(self, folder_path, output_dir, file_mask="*", last_updated_at=None):
+        """
+        Downloads files from a OneDrive folder to a local directory.
+
+        Args:
+            folder_path (str): The path of the folder to download files from. Use '/' to specify the root folder.
+            output_dir (str): The path of the local directory to save the downloaded files to.
+            file_mask (str, optional): A file name pattern to filter the files to download. Use '*' to match any
+            sequence of characters, or '?' to match any single character.
+            last_updated_at (datetime.datetime, optional): A datetime object representing the minimum last modified
+            date and time of files to download. If provided, only files that were last modified on or after this date
+            will be downloaded. Defaults to None, meaning all files will be downloaded.
+
+        Returns:
+            None
+
+        Raises:
+            OneDriveClientException: If an error occurs while getting folder contents or downloading a file.
+
+        """
         items = self.list_folder_contents(folder_path)
         for item in items:
             # logging.info(item["name"])
             if item.get('file') is not None:
                 if fnmatch.fnmatch(item['name'], file_mask):
+                    last_modified = datetime.fromisoformat(item['lastModifiedDateTime'][:-1])
+                    if last_updated_at and last_modified < last_updated_at:
+                        # skip downloading the file
+                        logging.info(
+                            f"Skipping file {item['name']} because it was last modified before {last_updated_at}.")
+                        continue
+
                     logging.info(f"Downloading file {item['name']} ...")
                     file_url = item['@microsoft.graph.downloadUrl']
                     output_path = os.path.join(output_dir, item['name'])
@@ -124,4 +151,5 @@ class OneDriveClient:
                     subfolder_path = f"{folder_path}{item['name']}"
                 else:
                     subfolder_path = f"{folder_path}/{item['name']}"
-                self.download_files(subfolder_path, output_dir, file_mask)
+                self.download_files(subfolder_path, output_dir, file_mask, last_updated_at)
+

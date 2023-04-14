@@ -1,6 +1,10 @@
 import logging
+
 from keboola.component.base import ComponentBase
 from keboola.component.exceptions import UserException
+import keboola.utils.date as dutils
+from datetime import datetime
+
 from client.OneDriveBusiness import OneDriveBusinessClient
 from client.OneDriveClient import OneDriveClient
 
@@ -11,6 +15,7 @@ KEY_FOLDER = 'folder'
 KEY_MASK = 'mask'
 KEY_ACCOUNT_TYPE = 'account_type'
 KEY_CUSTOM_TAG = 'custom_tag'
+KEY_LAST_UPDATED_AT = 'last_updated_at'
 
 # List of required parameters
 REQUIRED_PARAMETERS = [KEY_ACCOUNT_TYPE]
@@ -32,21 +37,36 @@ class Component(ComponentBase):
         self.validate_configuration_parameters(REQUIRED_PARAMETERS)
         self.validate_image_parameters(REQUIRED_IMAGE_PARS)
         params = self.configuration.parameters
+        statefile = self.get_state_file()
         folder = params.get(KEY_FOLDER, "/") or "/"
         if not folder.startswith("/"):
             folder = "/"+folder
         mask = params.get(KEY_MASK, "*") or "*"
         tag = params.get(KEY_CUSTOM_TAG, False)
         tags = [tag] if tag else []
+        last_updated_at = params.get(KEY_LAST_UPDATED_AT, None)
+        if last_updated_at:
+            if last_updated_at == "last run":
+                if statefile.get("last_run", False):
+                    last_updated_at = datetime.strptime(statefile.get("last_run"), '%Y-%m-%d %H:%M:%S')
+                else:
+                    logging.error("last_run not found in statefile. Cannot filter based on time.")
+                    last_updated_at = None
+            else:
+                last_updated_at, _ = dutils.parse_datetime_interval(last_updated_at, 'today')
+            logging.info(f"Component will download files with lastModifiedDateTime > {last_updated_at}")
 
         account_type = self.configuration.parameters.get("account_type")
         client = self.get_client(account_type)
         logging.info(f"Component will download files from folder: {folder} with mask: {mask}")
-        client.download_files(folder_path=folder, file_mask=mask, output_dir=self.files_out_path)
+        client.download_files(folder_path=folder, file_mask=mask, output_dir=self.files_out_path,
+                              last_updated_at=last_updated_at)
 
         for filename in client.downloaded_files:
             file_def = self.create_out_file_definition(filename, tags=tags)
             self.write_manifest(file_def)
+
+        self.write_state_file({"last_run": datetime.today().strftime('%Y-%m-%d %H:%M:%S')})
 
     def get_client(self, account_type):
         if account_type == "private":

@@ -3,6 +3,7 @@ import logging
 import os
 from msal import ConfidentialClientApplication
 import fnmatch
+from datetime import datetime
 
 
 class OneDriveBusinessClientException(Exception):
@@ -99,24 +100,6 @@ class OneDriveBusinessClient:
 
         self.downloaded_files.append(filename)
 
-    def download_files(self, folder_path, file_mask, output_dir):
-        items = self.list_folder_contents(folder_path)
-
-        for item in items:
-            if item.get('file') is not None:
-                if fnmatch.fnmatch(item['name'], file_mask):
-                    logging.info(f"Downloading file {item['name']} ...")
-                    file_url = item['@microsoft.graph.downloadUrl']
-                    output_path = os.path.join(output_dir, item['name'])
-                    self.download_file_from_onedrive_url(file_url, output_path, item['name'])
-
-            elif item.get('folder') is not None:
-                if folder_path == "/":
-                    subfolder_path = f"{folder_path}{item['name']}"
-                else:
-                    subfolder_path = f"{folder_path}/{item['name']}"
-                self.download_files(subfolder_path, file_mask, output_dir)
-
     def get_site_id_and_url(self, site_name):
         search_url = f"https://graph.microsoft.com/v1.0/sites?search={site_name}"
         headers = {'Authorization': f'Bearer {self.access_token}'}
@@ -133,3 +116,46 @@ class OneDriveBusinessClient:
         else:
             raise OneDriveBusinessClientException(f"Error occurred when searching for the site:"
                                                   f" {response.status_code}, {response.text}")
+
+def download_files(self, folder_path, file_mask="*", output_dir=None, last_updated_at=None):
+    """
+    Downloads files from a SharePoint folder to a local directory.
+
+    Args:
+        folder_path (str): The path of the folder to download files from. Use '/' to specify the root folder.
+        file_mask (str, optional): A file name pattern to filter the files to download. Use '*' to match any sequence of characters, or '?' to match any single character.
+        output_dir (str, optional): The path of the local directory to save the downloaded files to. If not specified, files will be saved to the current working directory.
+        last_updated_at (datetime.datetime, optional): A datetime object representing the minimum last modified date and time of files to download. If provided, only files that were last modified on or after this date will be downloaded. Defaults to None, meaning all files will be downloaded.
+
+    Returns:
+        None
+
+    Raises:
+        OneDriveBusinessClientException: If an error occurs while getting folder contents or downloading a file.
+
+    """
+    if output_dir is None:
+        output_dir = os.getcwd()
+
+    items = self.list_folder_contents(folder_path)
+
+    for item in items:
+        if item.get('file') is not None:
+            if fnmatch.fnmatch(item['name'], file_mask):
+                last_modified = datetime.fromisoformat(item['lastModifiedDateTime'][:-1])
+                if last_updated_at and last_modified < last_updated_at:
+                    # skip downloading the file
+                    logging.info(f"Skipping file {item['name']} because it was last modified before {last_updated_at}.")
+                    continue
+
+                logging.info(f"Downloading file {item['name']} ...")
+                file_url = item['@microsoft.graph.downloadUrl']
+                output_path = os.path.join(output_dir, item['name'])
+                self.download_file_from_onedrive_url(file_url, output_path, item['name'])
+
+        elif item.get('folder') is not None:
+            if folder_path == "/":
+                subfolder_path = f"{folder_path}{item['name']}"
+            else:
+                subfolder_path = f"{folder_path}/{item['name']}"
+            self.download_files(subfolder_path, file_mask, output_dir, last_updated_at)
