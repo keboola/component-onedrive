@@ -117,7 +117,7 @@ class OneDriveBusinessClient:
             raise OneDriveBusinessClientException(f"Error occurred when searching for the site:"
                                                   f" {response.status_code}, {response.text}")
 
-    def download_files(self, folder_path, file_mask="*", output_dir=None, last_updated_at=None):
+    def download_files(self, folder_path, file_mask="*", output_dir=None, last_modified_at=None):
         """
         Downloads files from a SharePoint folder to a local directory.
 
@@ -127,7 +127,7 @@ class OneDriveBusinessClient:
             sequence of characters, or '?' to match any single character.
             output_dir (str, optional): The path of the local directory to save the downloaded files to. If not
             specified, files will be saved to the current working directory.
-            last_updated_at (datetime.datetime, optional): A datetime object representing the minimum last modified date
+            last_modified_at (datetime.datetime, optional): A datetime object representing the minimum last modified date
             and time of files to download. If provided, only files that were last modified on or after this date will be
              downloaded. Defaults to None, meaning all files will be downloaded.
 
@@ -147,10 +147,10 @@ class OneDriveBusinessClient:
             if item.get('file') is not None:
                 if fnmatch.fnmatch(item['name'], file_mask):
                     last_modified = datetime.fromisoformat(item['lastModifiedDateTime'][:-1])
-                    if last_updated_at and last_modified < last_updated_at:
+                    if last_modified_at and last_modified < last_modified_at:
                         # skip downloading the file
                         logging.info(
-                            f"Skipping file {item['name']} because it was last modified before {last_updated_at}.")
+                            f"Skipping file {item['name']} because it was last modified before {last_modified_at}.")
                         continue
 
                     logging.info(f"Downloading file {item['name']} ...")
@@ -163,4 +163,4 @@ class OneDriveBusinessClient:
                     subfolder_path = f"{folder_path}{item['name']}"
                 else:
                     subfolder_path = f"{folder_path}/{item['name']}"
-                self.download_files(subfolder_path, file_mask, output_dir, last_updated_at)
+                self.download_files(subfolder_path, file_mask, output_dir, last_modified_at)

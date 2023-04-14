@@ -15,7 +15,7 @@ KEY_FOLDER = 'folder'
 KEY_MASK = 'mask'
 KEY_ACCOUNT_TYPE = 'account_type'
 KEY_CUSTOM_TAG = 'custom_tag'
-KEY_LAST_UPDATED_AT = 'last_updated_at'
+KEY_LAST_MODIFIED_AT = 'last_modified_at'
 
 # List of required parameters
 REQUIRED_PARAMETERS = [KEY_ACCOUNT_TYPE]
@@ -44,23 +44,23 @@ class Component(ComponentBase):
         mask = params.get(KEY_MASK, "*") or "*"
         tag = params.get(KEY_CUSTOM_TAG, False)
         tags = [tag] if tag else []
-        last_updated_at = params.get(KEY_LAST_UPDATED_AT, None)
-        if last_updated_at:
-            if last_updated_at == "last run":
+        last_modified_at = params.get(KEY_LAST_MODIFIED_AT, None)
+        if last_modified_at:
+            if last_modified_at == "last run":
                 if statefile.get("last_run", False):
-                    last_updated_at = datetime.strptime(statefile.get("last_run"), '%Y-%m-%d %H:%M:%S')
+                    last_modified_at = datetime.strptime(statefile.get("last_run"), '%Y-%m-%d %H:%M:%S')
                 else:
                     logging.error("last_run not found in statefile. Cannot filter based on time.")
-                    last_updated_at = None
+                    last_modified_at = None
             else:
-                last_updated_at, _ = dutils.parse_datetime_interval(last_updated_at, 'today')
-            logging.info(f"Component will download files with lastModifiedDateTime > {last_updated_at}")
+                last_modified_at, _ = dutils.parse_datetime_interval(last_modified_at, 'today')
+            logging.info(f"Component will download files with lastModifiedDateTime > {last_modified_at}")
 
         account_type = self.configuration.parameters.get("account_type")
         client = self.get_client(account_type)
         logging.info(f"Component will download files from folder: {folder} with mask: {mask}")
         client.download_files(folder_path=folder, file_mask=mask, output_dir=self.files_out_path,
-                              last_updated_at=last_updated_at)
+                              last_modified_at=last_modified_at)
 
         for filename in client.downloaded_files:
             file_def = self.create_out_file_definition(filename, tags=tags)
