@@ -36,7 +36,7 @@ class OneDriveBusinessClient:
             self.site_id, self.site_url = self.get_site_id_and_url(site_name)
             self.endpoint = f'https://graph.microsoft.com/v1.0/sites/{self.site_id}'
         else:
-            self.endpoint = f'https://graph.microsoft.com/v1.0/me/drive'
+            self.endpoint = 'https://graph.microsoft.com/v1.0/me/drive'
 
         self.downloaded_files = []
 
