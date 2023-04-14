@@ -152,4 +152,3 @@ class OneDriveClient:
                 else:
                     subfolder_path = f"{folder_path}/{item['name']}"
                 self.download_files(subfolder_path, output_dir, file_mask, last_updated_at)
-

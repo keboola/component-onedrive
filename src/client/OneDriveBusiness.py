@@ -123,9 +123,13 @@ def download_files(self, folder_path, file_mask="*", output_dir=None, last_updat
 
     Args:
         folder_path (str): The path of the folder to download files from. Use '/' to specify the root folder.
-        file_mask (str, optional): A file name pattern to filter the files to download. Use '*' to match any sequence of characters, or '?' to match any single character.
-        output_dir (str, optional): The path of the local directory to save the downloaded files to. If not specified, files will be saved to the current working directory.
-        last_updated_at (datetime.datetime, optional): A datetime object representing the minimum last modified date and time of files to download. If provided, only files that were last modified on or after this date will be downloaded. Defaults to None, meaning all files will be downloaded.
+        file_mask (str, optional): A file name pattern to filter the files to download. Use '*' to match any sequence
+        of characters, or '?' to match any single character.
+        output_dir (str, optional): The path of the local directory to save the downloaded files to. If not specified,
+         files will be saved to the current working directory.
+        last_updated_at (datetime.datetime, optional): A datetime object representing the minimum last modified date
+        and time of files to download. If provided, only files that were last modified on or after this date will be
+         downloaded. Defaults to None, meaning all files will be downloaded.
 
     Returns:
         None
