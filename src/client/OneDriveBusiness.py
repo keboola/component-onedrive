@@ -127,9 +127,9 @@ class OneDriveBusinessClient:
             sequence of characters, or '?' to match any single character.
             output_dir (str, optional): The path of the local directory to save the downloaded files to. If not
             specified, files will be saved to the current working directory.
-            last_modified_at (datetime.datetime, optional): A datetime object representing the minimum last modified date
-            and time of files to download. If provided, only files that were last modified on or after this date will be
-             downloaded. Defaults to None, meaning all files will be downloaded.
+            last_modified_at (datetime.datetime, optional): A datetime object representing the minimum last modified
+            date and time of files to download. If provided, only files that were last modified on or after this date
+            will be downloaded. Defaults to None, meaning all files will be downloaded.
 
         Returns:
             None
