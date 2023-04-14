@@ -11,7 +11,11 @@ class OneDriveBusinessClientException(Exception):
 
 
 class OneDriveBusinessClient:
-    def __init__(self, refresh_token, files_out_folder, client_id, client_secret, tenant_id, site_name):
+    def __init__(self, refresh_token, files_out_folder, client_id, client_secret, tenant_id, site_name=None,
+                 account_type=None):
+        self.account_type = account_type
+        if self.account_type == "sharepoint" and site_name is None:
+            raise OneDriveBusinessClientException("Parameter site_name must be specified for account type: sharepoint")
         self.files_out_folder = files_out_folder
         self.refresh_token = refresh_token
         self.access_token = None
@@ -27,8 +31,13 @@ class OneDriveBusinessClient:
         )
 
         self.get_access_token(refresh_token=refresh_token)
-        self.site_id, self.site_url = self.get_site_id_and_url(site_name)
-        self.endpoint = f'https://graph.microsoft.com/v1.0/sites/{self.site_id}'
+
+        if site_name:
+            self.site_id, self.site_url = self.get_site_id_and_url(site_name)
+            self.endpoint = f'https://graph.microsoft.com/v1.0/sites/{self.site_id}'
+        else:
+            self.endpoint = f'https://graph.microsoft.com/v1.0/me/drive'
+
         self.downloaded_files = []
 
     def get_access_token(self, refresh_token: str):
@@ -60,7 +69,33 @@ class OneDriveBusinessClient:
         logging.info("Access token fetched")
         self.access_token = response.json()["access_token"]
 
-    def list_folder_contents(self, folder_path=None):
+    def list_folder_contents_ofb(self, folder_path=None):
+        if folder_path is None or folder_path == '/':
+            folder_id = 'root'
+        else:
+            # Resolve the path to a folder id
+            drive_root = f"{self.endpoint}/root"
+            headers = {'Authorization': f'Bearer {self.access_token}'}
+            response = requests.get(f"{drive_root}:/{'/'.join(folder_path.split('/')[1:])}:/", headers=headers)
+            if response.status_code == 200:
+                folder_id = response.json()['id']
+            else:
+                raise Exception(f"Error resolving folder path '{folder_path}': {response.status_code}, {response.text}")
+
+        folder_path = f"{self.endpoint}/root/children" if folder_id == 'root' else \
+            f"{self.endpoint}/items/{folder_id}/children"
+
+        headers = {'Authorization': f'Bearer {self.access_token}'}
+        response = requests.get(folder_path, headers=headers)
+
+        if response.status_code == 200:
+            items = response.json()['value']
+            return items
+        else:
+            raise OneDriveBusinessClientException(f"Error occurred when getting folder content:"
+                                                  f" {response.status_code}, {response.text}")
+
+    def list_folder_contents_sharepoint(self, folder_path=None):
         if folder_path is None or folder_path == '/':
             folder_id = 'root'
         else:
@@ -141,7 +176,10 @@ class OneDriveBusinessClient:
         if output_dir is None:
             output_dir = os.getcwd()
 
-        items = self.list_folder_contents(folder_path)
+        if self.account_type == "onedrive_for_business":
+            items = self.list_folder_contents_ofb(folder_path)
+        else:
+            items = self.list_folder_contents_sharepoint(folder_path)
 
         for item in items:
             if item.get('file') is not None:

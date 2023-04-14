@@ -5,8 +5,8 @@ from keboola.component.exceptions import UserException
 import keboola.utils.date as dutils
 from datetime import datetime
 
-from client.OneDriveBusiness import OneDriveBusinessClient
-from client.OneDriveClient import OneDriveClient
+from client.OneDriveBusiness import OneDriveBusinessClient, OneDriveBusinessClientException
+from client.OneDriveClient import OneDriveClient, OneDriveClientException
 
 # Configuration variables
 KEY_TENANT_ID = 'tenant_id'
@@ -59,8 +59,11 @@ class Component(ComponentBase):
         account_type = self.configuration.parameters.get("account_type")
         client = self.get_client(account_type)
         logging.info(f"Component will download files from folder: {folder} with mask: {mask}")
-        client.download_files(folder_path=folder, file_mask=mask, output_dir=self.files_out_path,
-                              last_modified_at=last_modified_at)
+        try:
+            client.download_files(folder_path=folder, file_mask=mask, output_dir=self.files_out_path,
+                                  last_modified_at=last_modified_at)
+        except (OneDriveClientException, OneDriveBusinessClientException) as e:
+            raise UserException(e) from e
 
         for filename in client.downloaded_files:
             file_def = self.create_out_file_definition(filename, tags=tags)
@@ -69,10 +72,10 @@ class Component(ComponentBase):
         self.write_state_file({"last_run": datetime.today().strftime('%Y-%m-%d %H:%M:%S')})
 
     def get_client(self, account_type):
-        if account_type == "private":
+        if account_type == "private_onedrive":
             client = OneDriveClient(refresh_token=self.refresh_token, files_out_folder=self.files_out_path,
                                     client_id=self.client_id, client_secret=self.client_secret)
-        elif account_type == "work_school":
+        elif account_type == "onedrive_for_business":
             tenant_id = self.configuration.parameters.get(KEY_TENANT_ID)
             site_name = self.configuration.parameters.get(KEY_SITE_NAME)
             logging.info(f"Site name set to {site_name}")
@@ -82,7 +85,19 @@ class Component(ComponentBase):
                                             client_id=self.client_id,
                                             client_secret=self.client_secret,
                                             tenant_id=tenant_id,
-                                            site_name=site_name)
+                                            account_type=account_type)
+        elif account_type == "sharepoint":
+            tenant_id = self.configuration.parameters.get(KEY_TENANT_ID)
+            site_name = self.configuration.parameters.get(KEY_SITE_NAME)
+            logging.info(f"Site name set to {site_name}")
+
+            client = OneDriveBusinessClient(refresh_token=self.refresh_token,
+                                            files_out_folder=self.files_out_path,
+                                            client_id=self.client_id,
+                                            client_secret=self.client_secret,
+                                            tenant_id=tenant_id,
+                                            site_name=site_name,
+                                            account_type=account_type)
         else:
             raise UserException(f"Unsupported Account Type: {account_type}")
         return client

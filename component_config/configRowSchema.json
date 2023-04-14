@@ -10,14 +10,16 @@
       "title": "Account Type",
       "required": true,
       "enum": [
-        "private",
-        "work_school"
+        "private_onedrive",
+        "onedrive_for_business",
+        "sharepoint"
       ],
       "default": "work_school",
       "options": {
         "enum_titles": [
-          "Private/Personal",
-          "Work/School"
+          "Private OneDrive",
+          "OneDrive for Business",
+          "SharePoint"
         ]
       },
       "propertyOrder": 1
@@ -29,7 +31,7 @@
       "description": "You can find the Tenant ID in the <a href='https://portal.azure.com/#home'>Azure Portal</a>. After signing in, click on 'Azure Active Directory' in the left-hand menu. The Tenant ID can be found in the 'Tenant information' section on the 'Azure Active Directory' overview page.",
       "options": {
         "dependencies": {
-          "account_type": "work_school"
+          "account_type": ["onedrive_for_business", "sharepoint"]
         }
       },
       "propertyOrder": 2
@@ -41,7 +43,7 @@
       "description": "You can find the site name in the url address when you visit your SharePoint or OneDrive for Business.",
       "options": {
         "dependencies": {
-          "account_type": "work_school"
+          "account_type": "sharepoint"
         }
       },
       "propertyOrder": 3
