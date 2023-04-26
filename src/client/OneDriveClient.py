@@ -3,7 +3,6 @@ import logging
 import fnmatch
 import os
 from datetime import datetime
-from keboola.http_client import HttpClient
 
 
 class OneDriveClientException(Exception):
@@ -269,5 +268,3 @@ class OneDriveClient:
             return sites_list
         else:
             raise Exception(f"Error occurred when fetching SharePoint sites: {response.status_code}, {response.text}")
-
-
