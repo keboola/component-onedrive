@@ -1,11 +1,10 @@
 import logging
 
-from keboola.component.base import ComponentBase
+from keboola.component.base import ComponentBase, sync_action
 from keboola.component.exceptions import UserException
 import keboola.utils.date as dutils
 from datetime import datetime
 
-from client.OneDriveBusiness import OneDriveBusinessClient, OneDriveBusinessClientException
 from client.OneDriveClient import OneDriveClient, OneDriveClientException
 
 # Configuration variables
@@ -13,13 +12,11 @@ KEY_TENANT_ID = 'tenant_id'
 KEY_SITE_NAME = 'site_name'
 KEY_FOLDER = 'folder'
 KEY_MASK = 'mask'
-KEY_ACCOUNT_TYPE = 'account_type'
 KEY_CUSTOM_TAG = 'custom_tag'
 KEY_LAST_MODIFIED_AT = 'last_modified_at'
 
 # List of required parameters
-REQUIRED_PARAMETERS = [KEY_ACCOUNT_TYPE]
-REQUIRED_IMAGE_PARS = []
+REQUIRED_PARAMETERS = []
 
 
 class Component(ComponentBase):
@@ -34,8 +31,6 @@ class Component(ComponentBase):
         )
 
     def run(self):
-        self.validate_configuration_parameters(REQUIRED_PARAMETERS)
-        self.validate_image_parameters(REQUIRED_IMAGE_PARS)
         params = self.configuration.parameters
         statefile = self.get_state_file()
         folder = params.get(KEY_FOLDER, "/") or "/"
@@ -56,13 +51,12 @@ class Component(ComponentBase):
                 last_modified_at, _ = dutils.parse_datetime_interval(last_modified_at, 'today')
             logging.info(f"Component will download files with lastModifiedDateTime > {last_modified_at}")
 
-        account_type = self.configuration.parameters.get("account_type")
-        client = self.get_client(account_type)
+        client = self.get_client(params)
         logging.info(f"Component will download files from folder: {folder} with mask: {mask}")
         try:
             client.download_files(folder_path=folder, file_mask=mask, output_dir=self.files_out_path,
                                   last_modified_at=last_modified_at)
-        except (OneDriveClientException, OneDriveBusinessClientException) as e:
+        except OneDriveClientException as e:
             raise UserException(e) from e
 
         for filename in client.downloaded_files:
@@ -71,36 +65,33 @@ class Component(ComponentBase):
 
         self.write_state_file({"last_run": datetime.today().strftime('%Y-%m-%d %H:%M:%S')})
 
-    def get_client(self, account_type):
-        if account_type == "private_onedrive":
+    def get_client(self, params):
+        tenant_id = params.get(KEY_TENANT_ID, None)
+        site_name = params.get(KEY_SITE_NAME, None)
+        try:
             client = OneDriveClient(refresh_token=self.refresh_token, files_out_folder=self.files_out_path,
-                                    client_id=self.client_id, client_secret=self.client_secret)
-        elif account_type == "onedrive_for_business":
-            tenant_id = self.configuration.parameters.get(KEY_TENANT_ID)
-            site_name = self.configuration.parameters.get(KEY_SITE_NAME)
-            logging.info(f"Site name set to {site_name}")
+                                    client_id=self.client_id, client_secret=self.client_secret,
+                                    tenant_id=tenant_id, site_name=site_name)
+        except OneDriveClientException as e:
+            raise UserException(e) from e
 
-            client = OneDriveBusinessClient(refresh_token=self.refresh_token,
-                                            files_out_folder=self.files_out_path,
-                                            client_id=self.client_id,
-                                            client_secret=self.client_secret,
-                                            tenant_id=tenant_id,
-                                            account_type=account_type)
-        elif account_type == "sharepoint":
-            tenant_id = self.configuration.parameters.get(KEY_TENANT_ID)
-            site_name = self.configuration.parameters.get(KEY_SITE_NAME)
-            logging.info(f"Site name set to {site_name}")
-
-            client = OneDriveBusinessClient(refresh_token=self.refresh_token,
-                                            files_out_folder=self.files_out_path,
-                                            client_id=self.client_id,
-                                            client_secret=self.client_secret,
-                                            tenant_id=tenant_id,
-                                            site_name=site_name,
-                                            account_type=account_type)
-        else:
-            raise UserException(f"Unsupported Account Type: {account_type}")
         return client
+
+    @sync_action("listSites")
+    def list_sharepoint_sites(self):
+        params = self.configuration.parameters
+        client = self.get_client(params)
+        sites = client.list_sharepoint_sites()
+
+        transformed_list = []
+        for site in sites:
+            transformed_site = {
+                'label': site['name'],
+                'value': site['name']
+            }
+            transformed_list.append(transformed_site)
+
+        return transformed_list
 
 
 # Main entrypoint
