@@ -1,25 +1,23 @@
 import logging
 
-from keboola.component.base import ComponentBase
+from keboola.component.base import ComponentBase, sync_action
 from keboola.component.exceptions import UserException
-import keboola.utils.date as dutils
 from datetime import datetime
 
-from client.OneDriveBusiness import OneDriveBusinessClient, OneDriveBusinessClientException
 from client.OneDriveClient import OneDriveClient, OneDriveClientException
 
 # Configuration variables
+KEY_GROUP_ACCOUNT = 'account'
+KEY_GROUP_SETTINGS = 'settings'
+KEY_GROUP_DESTINATION = 'destination'
 KEY_TENANT_ID = 'tenant_id'
 KEY_SITE_NAME = 'site_name'
-KEY_FOLDER = 'folder'
-KEY_MASK = 'mask'
-KEY_ACCOUNT_TYPE = 'account_type'
+KEY_FILE_PATH = 'file_path'
 KEY_CUSTOM_TAG = 'custom_tag'
-KEY_LAST_MODIFIED_AT = 'last_modified_at'
+NEW_FILES_ONLY = 'new_files_only'
 
 # List of required parameters
-REQUIRED_PARAMETERS = [KEY_ACCOUNT_TYPE]
-REQUIRED_IMAGE_PARS = []
+REQUIRED_PARAMETERS = []
 
 
 class Component(ComponentBase):
@@ -34,73 +32,77 @@ class Component(ComponentBase):
         )
 
     def run(self):
-        self.validate_configuration_parameters(REQUIRED_PARAMETERS)
-        self.validate_image_parameters(REQUIRED_IMAGE_PARS)
         params = self.configuration.parameters
+        account_params = params.get(KEY_GROUP_ACCOUNT)
+        settings_params = params.get(KEY_GROUP_SETTINGS)
+        destination_params = params.get(KEY_GROUP_DESTINATION)
         statefile = self.get_state_file()
-        folder = params.get(KEY_FOLDER, "/") or "/"
+
+        file_path = settings_params.get(KEY_FILE_PATH, None)
+        if not file_path:
+            file_path = "*"
+            logging.warning("File path is not set, the component will try to download everything "
+                            "from authorized drive!")
+        """
         if not folder.startswith("/"):
             folder = "/"+folder
-        mask = params.get(KEY_MASK, "*") or "*"
-        tag = params.get(KEY_CUSTOM_TAG, False)
+        """
+        tag = destination_params.get(KEY_CUSTOM_TAG, False)
         tags = [tag] if tag else []
-        last_modified_at = params.get(KEY_LAST_MODIFIED_AT, None)
+
+        last_modified_at = settings_params.get(NEW_FILES_ONLY, False)
         if last_modified_at:
-            if last_modified_at == "last run":
-                if statefile.get("last_run", False):
-                    last_modified_at = datetime.strptime(statefile.get("last_run"), '%Y-%m-%d %H:%M:%S')
-                else:
-                    logging.error("last_run not found in statefile. Cannot filter based on time.")
-                    last_modified_at = None
+            if statefile.get("last_modified", False):
+                last_modified_at = datetime.fromisoformat(statefile.get("last_modified"))
             else:
-                last_modified_at, _ = dutils.parse_datetime_interval(last_modified_at, 'today')
+                raise UserException("last_modified timestamp not found in statefile, Cannot download new files only. "
+                                    "To resolve this, disable this option in row config or "
+                                    "set last_modified in statefile manually.")
             logging.info(f"Component will download files with lastModifiedDateTime > {last_modified_at}")
 
-        account_type = self.configuration.parameters.get("account_type")
-        client = self.get_client(account_type)
-        logging.info(f"Component will download files from folder: {folder} with mask: {mask}")
+        client = self.get_client(account_params)
         try:
-            client.download_files(folder_path=folder, file_mask=mask, output_dir=self.files_out_path,
+            client.download_files(file_path=file_path, output_dir=self.files_out_path,
                                   last_modified_at=last_modified_at)
-        except (OneDriveClientException, OneDriveBusinessClientException) as e:
+        except OneDriveClientException as e:
             raise UserException(e) from e
 
         for filename in client.downloaded_files:
             file_def = self.create_out_file_definition(filename, tags=tags)
             self.write_manifest(file_def)
 
-        self.write_state_file({"last_run": datetime.today().strftime('%Y-%m-%d %H:%M:%S')})
+        freshest_timestamp = client.freshest_file_timestamp.isoformat()
+        self.write_state_file({"last_modified": freshest_timestamp})
+        logging.info(f"Saving freshest file timestamp to statefile: {freshest_timestamp}")
 
-    def get_client(self, account_type):
-        if account_type == "private_onedrive":
+    def get_client(self, account_params):
+        tenant_id = account_params.get(KEY_TENANT_ID, None)
+        site_name = account_params.get(KEY_SITE_NAME, None)
+        try:
             client = OneDriveClient(refresh_token=self.refresh_token, files_out_folder=self.files_out_path,
-                                    client_id=self.client_id, client_secret=self.client_secret)
-        elif account_type == "onedrive_for_business":
-            tenant_id = self.configuration.parameters.get(KEY_TENANT_ID)
-            site_name = self.configuration.parameters.get(KEY_SITE_NAME)
-            logging.info(f"Site name set to {site_name}")
+                                    client_id=self.client_id, client_secret=self.client_secret,
+                                    tenant_id=tenant_id, site_name=site_name)
+        except OneDriveClientException as e:
+            raise UserException(e) from e
 
-            client = OneDriveBusinessClient(refresh_token=self.refresh_token,
-                                            files_out_folder=self.files_out_path,
-                                            client_id=self.client_id,
-                                            client_secret=self.client_secret,
-                                            tenant_id=tenant_id,
-                                            account_type=account_type)
-        elif account_type == "sharepoint":
-            tenant_id = self.configuration.parameters.get(KEY_TENANT_ID)
-            site_name = self.configuration.parameters.get(KEY_SITE_NAME)
-            logging.info(f"Site name set to {site_name}")
-
-            client = OneDriveBusinessClient(refresh_token=self.refresh_token,
-                                            files_out_folder=self.files_out_path,
-                                            client_id=self.client_id,
-                                            client_secret=self.client_secret,
-                                            tenant_id=tenant_id,
-                                            site_name=site_name,
-                                            account_type=account_type)
-        else:
-            raise UserException(f"Unsupported Account Type: {account_type}")
         return client
+
+    @sync_action("listSites")
+    def list_sharepoint_sites(self):
+        params = self.configuration.parameters
+        account_params = params.get(KEY_GROUP_ACCOUNT)
+        client = self.get_client(account_params)
+        sites = client.list_sharepoint_sites()
+
+        transformed_list = []
+        for site in sites:
+            transformed_site = {
+                'label': site['name'],
+                'value': site['name']
+            }
+            transformed_list.append(transformed_site)
+
+        return transformed_list
 
 
 # Main entrypoint
