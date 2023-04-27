@@ -186,16 +186,43 @@ class OneDriveClient:
 
     @backoff.on_exception(backoff.expo, Exception, max_tries=6)
     def download_file_from_onedrive_url(self, url, output_path, filename):
+        """
+        Downloads a file from OneDrive using the provided download URL and saves it to the specified output path.
+
+        Args:
+            url (str): The download URL for the file on OneDrive.
+            output_path (str): The path where the downloaded file will be saved.
+            filename (str): The name of the file being downloaded.
+
+        Raises:
+            Exception: If an error occurs while downloading the file or if the response status code is not 200.
+
+        Retry behavior:
+            The method will retry up to 6 times with an exponential backoff strategy in the following cases:
+                - Any exception is raised during the download process.
+                - An error occurs while downloading the file and the response status code is not 200.
+            If the maximum number of retries is reached and the error persists, the method will raise an exception
+            and the download will be considered as failed.
+
+        Note:
+            This method does not retry in cases where the error is not recoverable, such as when the provided
+            download URL is invalid or the local file system runs out of space.
+        """
+
         headers = {"Authorization": f"Bearer {self.access_token}"}
         response = requests.get(url, headers=headers, stream=True)
 
-        if response.status_code == 200:
-            with open(output_path, "wb") as f:
-                for chunk in response.iter_content(chunk_size=32768):
-                    f.write(chunk)
-            logging.info(f"File {filename} downloaded.")
-        else:
-            raise Exception(f"Error downloading file: {response.status_code}, {response.text}")
+        try:
+            parsed_response = self._parse_response(response, url)
+            if parsed_response is not None:
+                with open(output_path, "wb") as f:
+                    for chunk in response.iter_content(chunk_size=32768):
+                        f.write(chunk)
+                logging.info(f"File {filename} downloaded.")
+            else:
+                logging.warning(f"No content in the response for file {filename}.")
+        except exceptions.OneDriveClientException as e:
+            raise e
 
         if filename in self.downloaded_files:
             logging.warning(f"File {filename} has the same as an already downloaded file. It will be overwritten.")
@@ -235,9 +262,8 @@ class OneDriveClient:
             if item.get('file') is not None:
                 if fnmatch.fnmatch(item['name'], mask):
                     last_modified = datetime.fromisoformat(item['lastModifiedDateTime'][:-1])
-                    logging.info(f"File {item['name']} last modified: {last_modified}")
                     self.update_freshest_file_timestamp(last_modified)
-                    if last_modified_at and last_modified < last_modified_at:
+                    if last_modified_at and last_modified <= last_modified_at:
                         # skip downloading the file
                         logging.info(
                             f"Skipping file {item['name']} because it was last modified before {last_modified_at}.")
