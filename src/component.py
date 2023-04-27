@@ -50,15 +50,16 @@ class Component(ComponentBase):
         tag = destination_params.get(KEY_CUSTOM_TAG, False)
         tags = [tag] if tag else []
 
-        last_modified_at = settings_params.get(NEW_FILES_ONLY, False)
-        if last_modified_at:
+        get_new_only = settings_params.get(NEW_FILES_ONLY, False)
+        last_modified_at = False
+        if get_new_only:
             if statefile.get("last_modified", False):
                 last_modified_at = datetime.fromisoformat(statefile.get("last_modified"))
+                logging.info(f"Component will download files with lastModifiedDateTime > {last_modified_at}")
             else:
                 logging.warning("last_modified timestamp not found in statefile, Cannot download new files only. "
                                 "To resolve this, disable this option in row config or "
                                 "set last_modified in statefile manually.")
-            logging.info(f"Component will download files with lastModifiedDateTime > {last_modified_at}")
 
         client = self.get_client(account_params)
         try:

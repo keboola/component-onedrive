@@ -248,7 +248,7 @@ class OneDriveClient:
         """
 
         if not last_modified_at:
-            last_modified_at = "1999-01-01T00:00:00"
+            last_modified_at = datetime.strptime("1999-01-01T00:00:00", "%Y-%m-%dT%H:%M:%S")
 
         folder_path, mask = self.split_path_mask(file_path)
         logging.info(f"Downloading files matching mask {mask} from folder {folder_path}")
