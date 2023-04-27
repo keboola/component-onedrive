@@ -4,3 +4,4 @@ keboola.http-client
 mock
 freezegun
 keboola.http-client
+backoff==2.2.1
