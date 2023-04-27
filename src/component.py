@@ -55,9 +55,9 @@ class Component(ComponentBase):
             if statefile.get("last_modified", False):
                 last_modified_at = datetime.fromisoformat(statefile.get("last_modified"))
             else:
-                raise UserException("last_modified timestamp not found in statefile, Cannot download new files only. "
-                                    "To resolve this, disable this option in row config or "
-                                    "set last_modified in statefile manually.")
+                logging.warning("last_modified timestamp not found in statefile, Cannot download new files only. "
+                                "To resolve this, disable this option in row config or "
+                                "set last_modified in statefile manually.")
             logging.info(f"Component will download files with lastModifiedDateTime > {last_modified_at}")
 
         client = self.get_client(account_params)
