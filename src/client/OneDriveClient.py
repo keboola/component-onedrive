@@ -126,13 +126,12 @@ class OneDriveClient:
             # Resolve the path to a folder id
             drive_root = f"{self.endpoint}/root"
             headers = {'Authorization': f'Bearer {self.access_token}'}
-            url = f"{drive_root}:/{folder_path.lstrip('/')}:/"
+            url = f"https://graph.microsoft.com/v1.0/me/drive/root:/{folder_path.strip('/')}:/"
             response = requests.get(url, headers=headers)
             if response.status_code == 200:
                 folder_id = response.json()['id']
             else:
-                raise OneDriveClientException(f"Error resolving folder path '{folder_path}': "
-                                              f"{response.status_code}, {response.text}")
+                raise Exception(f"Error resolving folder path '{folder_path}': {response.status_code}, {response.text}")
 
         folder_path = f"{self.endpoint}/root/children" if folder_id == 'root' else \
             f"{self.endpoint}/items/{folder_id}/children"
@@ -267,8 +266,10 @@ class OneDriveClient:
             items = self.list_folder_contents_sharepoint(folder_path)
         elif self.client_type == "OneDriveForBusiness":
             items = self.list_folder_contents_ofb(folder_path)
-        else:
+        elif self.client_type == "OneDrive":
             items = self.list_folder_contents(folder_path)
+        else:
+            raise OneDriveClientException(f"Unsupported client type: {self.client_type}")
 
         for item in items:
             if item.get('file') is not None:
