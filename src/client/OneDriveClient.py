@@ -246,6 +246,10 @@ class OneDriveClient:
         Raises:
             OneDriveClientException: If an error occurs while getting folder contents or downloading a file.
         """
+
+        if not last_modified_at:
+            last_modified_at = "1999-01-01T00:00:00"
+
         folder_path, mask = self.split_path_mask(file_path)
         logging.info(f"Downloading files matching mask {mask} from folder {folder_path}")
         if last_modified_at:
