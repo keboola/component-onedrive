@@ -1,77 +1,102 @@
 {
   "type": "object",
-  "title": "extractor configuration",
-  "required": [
-    "account_type"
-  ],
+  "title": "Data Source configuration",
   "properties": {
-    "account_type": {
-      "type": "string",
-      "title": "Account Type",
-      "required": true,
-      "enum": [
-        "private_onedrive",
-        "onedrive_for_business",
-        "sharepoint"
-      ],
-      "default": "work_school",
-      "options": {
-        "enum_titles": [
-          "Private OneDrive",
-          "OneDrive for Business",
-          "SharePoint"
-        ]
-      },
-      "propertyOrder": 1
-    },
-    "tenant_id": {
-      "type": "string",
-      "title": "Tenant ID",
-      "required": true,
-      "description": "You can find the Tenant ID in the <a href='https://portal.azure.com/#home'>Azure Portal</a>. After signing in, click on 'Azure Active Directory' in the left-hand menu. The Tenant ID can be found in the 'Tenant information' section on the 'Azure Active Directory' overview page.",
-      "options": {
-        "dependencies": {
-          "account_type": ["onedrive_for_business", "sharepoint"]
+    "source": {
+      "type": "object",
+      "title": "Source",
+      "propertyOrder": 1,
+      "properties": {
+        "account_type": {
+          "type": "string",
+          "title": "Account Type",
+          "enum": [
+            "private_onedrive",
+            "onedrive_for_business",
+            "sharepoint"
+          ],
+          "default": "work_school",
+          "options": {
+            "enum_titles": [
+              "Private OneDrive",
+              "OneDrive for Business",
+              "SharePoint"
+            ]
+          },
+          "propertyOrder": 1
+        },
+        "tenant_id": {
+          "type": "string",
+          "title": "Tenant ID",
+          "description": "You can find the Tenant ID in the <a href='https://portal.azure.com/#home'>Azure Portal</a>. After signing in, click on 'Azure Active Directory' in the left-hand menu. The Tenant ID can be found in the 'Tenant information' section on the 'Azure Active Directory' overview page.",
+          "options": {
+            "dependencies": {
+              "account_type": [
+                "onedrive_for_business",
+                "sharepoint"
+              ]
+            }
+          },
+          "propertyOrder": 2
+        },
+        "site_name": {
+          "type": "array",
+          "title": "Site Name",
+          "items": {
+            "enum": [],
+            "type": "string"
+          },
+          "description": "You can find the site name in the url address when you visit your SharePoint or OneDrive for Business.",
+          "options": {
+            "dependencies": {
+              "account_type": "sharepoint"
+            },
+            "async": {
+              "label": "List Sites",
+              "action": "listSites"
+            }
+          },
+          "propertyOrder": 3
         }
-      },
-      "propertyOrder": 2
+      }
     },
-    "site_name": {
-      "type": "string",
-      "title": "Site Name",
-      "required": true,
-      "description": "You can find the site name in the url address when you visit your SharePoint or OneDrive for Business.",
-      "options": {
-        "dependencies": {
-          "account_type": "sharepoint"
+    "settings": {
+      "type": "object",
+      "title": "Settings",
+      "propertyOrder": 2,
+      "properties": {
+        "folder": {
+          "type": "string",
+          "title": "Folder (optional)",
+          "propertyOrder": 4,
+          "description": "Folder to search and download the files from."
+        },
+        "mask": {
+          "type": "string",
+          "title": "Mask (optional)",
+          "description": "Enter filenames mask.",
+          "propertyOrder": 5
+        },
+        "last_modified_at": {
+          "type": "string",
+          "title": "Last Modified At (optional)",
+          "default": "last run",
+          "description": "Date from which data is downloaded. Either date in YYYY-MM-DD format or dateparser string i.e. 5 days ago, 1 month ago, yesterday, etc. You can also set this as last run, which will fetch data from the last run of the component.",
+          "propertyOrder": 5
         }
-      },
-      "propertyOrder": 3
+      }
     },
-    "folder": {
-      "type": "string",
-      "title": "Folder (optional)",
-      "propertyOrder": 4,
-      "description": "Folder to search and download the files from."
-    },
-    "mask": {
-      "type": "string",
-      "title": "Mask (optional)",
-      "description": "Enter filenames mask.",
-      "propertyOrder": 5
-    },
-    "last_modified_at": {
-      "type": "string",
-      "title": "Last Modified At (optional)",
-      "default": "last run",
-      "description": "Date from which data is downloaded. Either date in YYYY-MM-DD format or dateparser string i.e. 5 days ago, 1 month ago, yesterday, etc. You can also set this as last run, which will fetch data from the last run of the component.",
-      "propertyOrder": 5
-    },
-    "custom_tag": {
-      "type": "string",
-      "title": "Custom Tag (optional)",
-      "description": "Adds custom tag to Keboola Storage for all downloaded files.",
-      "propertyOrder": 5
+    "destination": {
+      "type": "object",
+      "title": "Destination",
+      "properties": {
+        "custom_tag": {
+          "type": "string",
+          "title": "Custom Tag (optional)",
+          "description": "Adds custom tag to Keboola Storage for all downloaded files.",
+          "propertyOrder": 10
+        }
+      }
     }
   }
 }
