@@ -38,6 +38,7 @@ class OneDriveClient:
 
     @staticmethod
     def configure_onedrive_client():
+        logging.info("Initializing OneDrive client")
         client_type = "OneDrive"
         authority = 'https://login.microsoftonline.com/common'
         endpoint = 'https://graph.microsoft.com/v1.0/me'
@@ -45,6 +46,7 @@ class OneDriveClient:
         return client_type, authority, endpoint, scope
 
     def configure_sharepoint_client(self):
+        logging.info("Initializing Sharepoint client")
         client_type = "Sharepoint"
         authority = f'https://login.microsoftonline.com/{self.tenant_id}'
         self.scope = scope = 'https://graph.microsoft.com/Sites.Read.All https://graph.microsoft.com/Files.Read.All'
@@ -55,6 +57,7 @@ class OneDriveClient:
         return client_type, authority, endpoint, scope
 
     def configure_onedrive_for_business_client(self):
+        logging.info("Initializing OneDriveForBusiness client")
         client_type = "OneDriveForBusiness"
         authority = f'https://login.microsoftonline.com/{self.tenant_id}'
         endpoint = 'https://graph.microsoft.com/v1.0/me/drive'
@@ -95,11 +98,13 @@ class OneDriveClient:
             # Resolve the path to a folder id
             drive_root = f"{self.endpoint}/drive/root"
             headers = {'Authorization': f'Bearer {self.access_token}'}
-            response = requests.get(f"{drive_root}:/{'/'.join(folder_path.split('/')[1:])}:/", headers=headers)
+            url = f"{drive_root}:/{folder_path.lstrip('/')}:/"
+            response = requests.get(url, headers=headers)
             if response.status_code == 200:
                 folder_id = response.json()['id']
             else:
-                raise Exception(f"Error resolving folder path '{folder_path}': {response.status_code}, {response.text}")
+                raise OneDriveClientException(f"Error resolving folder path '{folder_path}': "
+                                              f"{response.status_code}, {response.text}")
 
         folder_path = f"{self.endpoint}/drive/root/children" if folder_id == 'root' else \
             f"{self.endpoint}/drive/items/{folder_id}/children"
@@ -121,11 +126,13 @@ class OneDriveClient:
             # Resolve the path to a folder id
             drive_root = f"{self.endpoint}/root"
             headers = {'Authorization': f'Bearer {self.access_token}'}
-            response = requests.get(f"{drive_root}:/{'/'.join(folder_path.split('/')[1:])}:/", headers=headers)
+            url = f"{drive_root}:/{folder_path.lstrip('/')}:/"
+            response = requests.get(url, headers=headers)
             if response.status_code == 200:
                 folder_id = response.json()['id']
             else:
-                raise Exception(f"Error resolving folder path '{folder_path}': {response.status_code}, {response.text}")
+                raise OneDriveClientException(f"Error resolving folder path '{folder_path}': "
+                                              f"{response.status_code}, {response.text}")
 
         folder_path = f"{self.endpoint}/root/children" if folder_id == 'root' else \
             f"{self.endpoint}/items/{folder_id}/children"
@@ -151,7 +158,8 @@ class OneDriveClient:
             if response.status_code == 200:
                 folder_id = response.json()['id']
             else:
-                raise Exception(f"Error resolving folder path '{folder_path}': {response.status_code}, {response.text}")
+                raise OneDriveClientException(f"Error resolving folder path '{folder_path}': "
+                                              f"{response.status_code}, {response.text}")
 
         folder_path = f"{self.endpoint}/drive/root/children" if folder_id == 'root' else \
             f"{self.endpoint}/drive/items/{folder_id}/children"
