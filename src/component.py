@@ -2,7 +2,6 @@ import logging
 
 from keboola.component.base import ComponentBase, sync_action
 from keboola.component.exceptions import UserException
-import keboola.utils.date as dutils
 from datetime import datetime
 
 from client.OneDriveClient import OneDriveClient, OneDriveClientException

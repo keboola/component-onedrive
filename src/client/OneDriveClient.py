@@ -366,4 +366,3 @@ class OneDriveClient:
             raise exceptions.BandwidthLimitExceeded(f'Calling endpoint {endpoint} failed', r)
         else:
             raise exceptions.UnknownError(f'Calling endpoint {endpoint} failed', r)
-
