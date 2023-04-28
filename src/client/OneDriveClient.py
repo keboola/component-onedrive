@@ -306,9 +306,8 @@ class OneDriveClient:
 
             for site in sites_data:
                 site_info = {
-                    'id': site['id'],
-                    'name': site['displayName'],
-                    'url': site['webUrl']
+                    'display_name': site['displayName'],
+                    'name': site['name']
                 }
                 sites_list.append(site_info)
 

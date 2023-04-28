@@ -104,7 +104,7 @@ class Component(ComponentBase):
         client = self.get_client(account_params)
         sites = client.list_sharepoint_sites()
 
-        return [SelectElement(label=site['name'], value=site['name']) for site in sites]
+        return [SelectElement(label=site['display_name'], value=site['name']) for site in sites]
 
 
 # Main entrypoint
