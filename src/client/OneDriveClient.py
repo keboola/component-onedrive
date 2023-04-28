@@ -155,7 +155,7 @@ class OneDriveClient:
                 folder_id = 'root'
             logging.info(f"The component will try to fetch files from library {library_name}")
             libraries = self.get_sharepoint_document_libraries()
-            library = next((l for l in libraries if l['name'] == library_name), None)
+            library = next((lib for lib in libraries if lib['name'] == library_name), None)
             if library is None:
                 raise OneDriveClientException(f"Library '{library_name}' not found")
             library_id = library['id']
