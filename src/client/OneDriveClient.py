@@ -126,7 +126,7 @@ class OneDriveClient:
             # Resolve the path to a folder id
             drive_root = f"{self.endpoint}/root"
             headers = {'Authorization': f'Bearer {self.access_token}'}
-            url = f"https://graph.microsoft.com/v1.0/me/drive/root:/{folder_path.strip('/')}:/"
+            url = f"{drive_root}:/{folder_path.strip('/')}:/"
             response = requests.get(url, headers=headers)
             if response.status_code == 200:
                 folder_id = response.json()['id']
