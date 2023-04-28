@@ -43,6 +43,7 @@
           "type": "string",
           "title": "Site Name",
           "description": "You can find the site name in the url address when you visit your SharePoint or OneDrive for Business.",
+          "propertyOrder": 3,
           "options": {
             "dependencies": {
               "account_type": "sharepoint"
@@ -52,7 +53,11 @@
               "action": "listSites"
             }
           },
-          "propertyOrder": 3
+          "items": {
+            "enum": [],
+            "type": "string"
+          },
+          "enum": []
         }
       }
     }
