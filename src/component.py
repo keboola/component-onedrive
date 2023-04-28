@@ -1,10 +1,13 @@
 import logging
+from datetime import datetime
+from typing import List
 
 from keboola.component.base import ComponentBase, sync_action
 from keboola.component.exceptions import UserException
-from datetime import datetime
+from keboola.component.sync_actions import SelectElement
 
 from client.OneDriveClient import OneDriveClient, OneDriveClientException
+
 
 # Configuration variables
 KEY_GROUP_ACCOUNT = 'account'
@@ -88,22 +91,20 @@ class Component(ComponentBase):
 
         return client
 
-    @sync_action("listSites")
-    def list_sharepoint_sites(self):
+    @sync_action('listSites')
+    def list_sharepoint_sites(self) -> List[SelectElement]:
+        """
+        Lists all SharePoint sites
+
+        Returns: a List of SelectElement objects containing 'name' and 'value' of the SharePoint site,
+        where both 'name' and 'value' are the name of the site
+        """
         params = self.configuration.parameters
         account_params = params.get(KEY_GROUP_ACCOUNT)
         client = self.get_client(account_params)
         sites = client.list_sharepoint_sites()
 
-        transformed_list = []
-        for site in sites:
-            transformed_site = {
-                'label': site['name'],
-                'value': site['name']
-            }
-            transformed_list.append(transformed_site)
-
-        return transformed_list
+        return [SelectElement(label=site['name'], value=site['name']) for site in sites]
 
 
 # Main entrypoint
