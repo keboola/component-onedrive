@@ -49,6 +49,26 @@
               "account_type": "sharepoint"
             }
           }
+        },
+        "library_name": {
+          "type": "string",
+          "title": "Library Name (optional)",
+          "description": "Name of the Document Library to download the data from.",
+          "propertyOrder": 4,
+          "options": {
+            "dependencies": {
+              "account_type": "sharepoint"
+            },
+                        "async": {
+              "label": "List Sites",
+              "action": "listSites"
+            },
+                      "items": {
+            "enum": [],
+            "type": "string"
+          },
+          "enum": []
+          }
         }
       }
     }

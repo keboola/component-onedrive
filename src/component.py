@@ -1,8 +1,10 @@
 import logging
 from datetime import datetime
+from typing import List
 
-from keboola.component.base import ComponentBase
+from keboola.component.base import ComponentBase, sync_action
 from keboola.component.exceptions import UserException
+from keboola.component.sync_actions import SelectElement
 
 from client.OneDriveClient import OneDriveClient, OneDriveClientException
 
@@ -90,6 +92,17 @@ class Component(ComponentBase):
             raise UserException(e) from e
 
         return client
+
+    @sync_action("listLibraries")
+    def list_sharepoint_libraries(self) -> List[SelectElement]:
+        params = self.configuration.parameters
+        account_params = params.get(KEY_GROUP_ACCOUNT)
+        site_url = account_params.get(KEY_SITE_URL)
+        client = self.get_client(account_params)
+
+        libraries = client.get_document_libraries(site_url)
+
+        return [SelectElement(label=library['name'], value=library['name']) for library in libraries]
 
 
 # Main entrypoint

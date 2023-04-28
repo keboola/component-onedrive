@@ -233,7 +233,8 @@ class OneDriveClient:
     def get_sharepoint_document_libraries(self):
         headers = {'Authorization': f'Bearer {self.access_token}'}
         site_id = self.get_site_id_from_url(self.site_url)
-        response = requests.get(f"{self.endpoint}/sites/{site_id}/lists", headers=headers)
+        url = f"{self.endpoint}/sites/{site_id}/lists"
+        response = requests.get(url, headers=headers)
 
         if response.status_code == 200:
             libraries = response.json()['value']
@@ -345,25 +346,25 @@ class OneDriveClient:
                     subfolder_path = f"{folder_path}/{item['name']}"
                 self.download_files(subfolder_path, output_dir, last_modified_at, library_name)
 
-    def list_sharepoint_sites(self):
-        sites_url = f"https://graph.microsoft.com/v1.0/{self.tenant_id}/sites?search=*"
-        headers = {'Authorization': f'Bearer {self.access_token}'}
-        response = requests.get(sites_url, headers=headers)
+    def get_document_libraries(self, site_url):
+        """
+        Retrieves a list of document libraries from a site using the Microsoft Graph API.
 
-        if response.status_code == 200:
-            sites_data = response.json()['value']
-            sites_list = []
+        :param site_url: The url of the site to retrieve the document libraries from.
+        :return: A list of dictionaries containing the document library metadata.
+        """
+        headers = {
+            'Authorization': 'Bearer ' + self.access_token,
+            'Content-Type': 'application/json'
+        }
 
-            for site in sites_data:
-                site_info = {
-                    'display_name': site['displayName'],
-                    'name': site['name']
-                }
-                sites_list.append(site_info)
+        site_id = self.get_site_id_from_url(site_url)
 
-            return sites_list
-        else:
-            raise Exception(f"Error occurred when fetching SharePoint sites: {response.status_code}, {response.text}")
+        url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/drives"
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+
+        return response.json()['value']
 
     @staticmethod
     def split_path_mask(file_path):
