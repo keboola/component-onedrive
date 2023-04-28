@@ -1,10 +1,8 @@
 import logging
 from datetime import datetime
-from typing import List
 
 from keboola.component.base import ComponentBase, sync_action
 from keboola.component.exceptions import UserException
-from keboola.component.sync_actions import SelectElement
 
 from client.OneDriveClient import OneDriveClient, OneDriveClientException
 
