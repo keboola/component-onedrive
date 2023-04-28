@@ -14,7 +14,7 @@ KEY_GROUP_ACCOUNT = 'account'
 KEY_GROUP_SETTINGS = 'settings'
 KEY_GROUP_DESTINATION = 'destination'
 KEY_TENANT_ID = 'tenant_id'
-KEY_SITE_NAME = 'site_name'
+KEY_SITE_URL = 'site_url'
 KEY_FILE_PATH = 'file_path'
 KEY_CUSTOM_TAG = 'custom_tag'
 NEW_FILES_ONLY = 'new_files_only'
@@ -81,11 +81,11 @@ class Component(ComponentBase):
 
     def get_client(self, account_params):
         tenant_id = account_params.get(KEY_TENANT_ID, None)
-        site_name = account_params.get(KEY_SITE_NAME, None)
+        site_url = account_params.get(KEY_SITE_URL, None)
         try:
             client = OneDriveClient(refresh_token=self.refresh_token, files_out_folder=self.files_out_path,
                                     client_id=self.client_id, client_secret=self.client_secret,
-                                    tenant_id=tenant_id, site_name=site_name)
+                                    tenant_id=tenant_id, site_url=site_url)
         except OneDriveClientException as e:
             raise UserException(e) from e
 

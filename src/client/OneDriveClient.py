@@ -4,6 +4,8 @@ import fnmatch
 import os
 from datetime import datetime
 import backoff
+from urllib.parse import urlparse
+
 from client import exceptions
 
 
@@ -12,14 +14,14 @@ class OneDriveClientException(Exception):
 
 
 class OneDriveClient:
-    def __init__(self, refresh_token, files_out_folder, client_id, client_secret, tenant_id=None, site_name=None):
+    def __init__(self, refresh_token, files_out_folder, client_id, client_secret, tenant_id=None, site_url=None):
         self.files_out_folder = files_out_folder
         self.refresh_token = refresh_token
         self.access_token = None
         self.client_id = client_id
         self.client_secret = client_secret
         self.tenant_id = tenant_id
-        self.site_name = site_name
+        self.site_url = site_url
         self.client_type, self.authority, self.endpoint, self.scope = self.configure_client()
         if not self.access_token:
             self.get_access_token(refresh_token=refresh_token)
@@ -27,14 +29,14 @@ class OneDriveClient:
         self.freshest_file_timestamp = None
 
     def configure_client(self):
-        if not self.tenant_id and not self.site_name:
+        if not self.tenant_id and not self.site_url:
             return self.configure_onedrive_client()
-        elif self.tenant_id and self.site_name:
+        elif self.tenant_id and self.site_url:
             return self.configure_sharepoint_client()
-        elif self.tenant_id and not self.site_name:
+        elif self.tenant_id and not self.site_url:
             return self.configure_onedrive_for_business_client()
         else:
-            raise OneDriveClientException(f"Unsupported settings: {self.tenant_id}, {self.site_name}")
+            raise OneDriveClientException(f"Unsupported settings: {self.tenant_id}, {self.site_url}")
 
     @staticmethod
     def configure_onedrive_client():
@@ -52,7 +54,7 @@ class OneDriveClient:
         self.scope = scope = 'https://graph.microsoft.com/Sites.Read.All https://graph.microsoft.com/Files.Read.All'
         # We need access token to get site id and url
         self.get_access_token(refresh_token=self.refresh_token)
-        site_id, site_url = self.get_site_id_and_url(self.site_name)
+        site_id = self.get_site_id_from_url(self.site_url)
         endpoint = f'https://graph.microsoft.com/v1.0/sites/{site_id}'
         return client_type, authority, endpoint, scope
 
@@ -173,23 +175,22 @@ class OneDriveClient:
             raise OneDriveClientException(f"Error occurred when getting folder content:"
                                           f" {response.status_code}, {response.text}")
 
-    def get_site_id_and_url(self, site_name):
-        """Returns site_id and url for Sharepoint site_name"""
-        search_url = f"https://graph.microsoft.com/v1.0/sites?search={site_name}"
+    def get_site_id_from_url(self, site_url: str):
+        parsed_url = urlparse(site_url)
+        hostname = parsed_url.netloc
+        server_relative_path = parsed_url.path
+
+        api_url = f"https://graph.microsoft.com/v1.0/sites/{hostname}:{server_relative_path}"
         headers = {'Authorization': f'Bearer {self.access_token}'}
-        response = requests.get(search_url, headers=headers)
+        response = requests.get(api_url, headers=headers)
+
         if response.status_code == 200:
-            sites = response.json()['value']
-            if len(sites) > 0:
-                site = sites[0]  # Assuming the first result is the desired site
-                site_id = site['id']
-                site_url = site['webUrl']
-                return site_id, site_url
-            else:
-                raise OneDriveClientException("No site found with the given name")
+            site = response.json()
+            site_id = site['id']
+            site_url = site['webUrl']
+            return site_id
         else:
-            raise OneDriveClientException(f"Error occurred when searching for the site:"
-                                          f" {response.status_code}, {response.text}")
+            raise Exception(f"Error occurred when fetching site information: {response.status_code}, {response.text}")
 
     @backoff.on_exception(backoff.expo, Exception, max_tries=6)
     def download_file_from_onedrive_url(self, url, output_path, filename):
