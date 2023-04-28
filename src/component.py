@@ -16,6 +16,7 @@ KEY_SITE_URL = 'site_url'
 KEY_FILE_PATH = 'file_path'
 KEY_CUSTOM_TAG = 'custom_tag'
 NEW_FILES_ONLY = 'new_files_only'
+KEY_LIBRARY_NAME = 'library_name'
 
 # List of required parameters
 REQUIRED_PARAMETERS = []
@@ -63,9 +64,10 @@ class Component(ComponentBase):
                                 "set last_modified in statefile manually.")
 
         client = self.get_client(account_params)
+        library_name = account_params.get(KEY_LIBRARY_NAME, None)
         try:
             client.download_files(file_path=file_path, output_dir=self.files_out_path,
-                                  last_modified_at=last_modified_at)
+                                  last_modified_at=last_modified_at, library_name=library_name)
         except OneDriveClientException as e:
             raise UserException(e) from e
 
