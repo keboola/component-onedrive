@@ -187,10 +187,10 @@ class OneDriveClient:
         if response.status_code == 200:
             site = response.json()
             site_id = site['id']
-            site_url = site['webUrl']
             return site_id
         else:
-            raise Exception(f"Error occurred when fetching site information: {response.status_code}, {response.text}")
+            raise OneDriveClientException(f"Error occurred when fetching site information: "
+                                          f"{response.status_code}, {response.text}")
 
     @backoff.on_exception(backoff.expo, Exception, max_tries=6)
     def download_file_from_onedrive_url(self, url, output_path, filename):
