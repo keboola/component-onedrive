@@ -91,21 +91,6 @@ class Component(ComponentBase):
 
         return client
 
-    @sync_action('listSites')
-    def list_sharepoint_sites(self) -> List[SelectElement]:
-        """
-        Lists all SharePoint sites
-
-        Returns: a List of SelectElement objects containing 'name' and 'value' of the SharePoint site,
-        where both 'name' and 'value' are the name of the site
-        """
-        params = self.configuration.parameters
-        account_params = params.get(KEY_GROUP_ACCOUNT)
-        client = self.get_client(account_params)
-        sites = client.list_sharepoint_sites()
-
-        return [SelectElement(label=site['display_name'], value=site['name']) for site in sites]
-
 
 # Main entrypoint
 if __name__ == "__main__":
