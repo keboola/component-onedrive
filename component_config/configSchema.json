@@ -39,20 +39,36 @@
           },
           "propertyOrder": 2
         },
-        "site_name": {
+        "site_url": {
           "type": "string",
-          "title": "Site Name",
-          "description": "You can find the site name in the url address when you visit your SharePoint or OneDrive for Business.",
+          "title": "Site Url",
+          "description": "Enter the URL of the SharePoint site you want to access. The site URL can be found in your browser's address bar when you visit the SharePoint site (e.g., https://your_domain.sharepoint.com/sites/your_site_name). Make sure to include the full URL, including the 'https://' prefix.",
+          "propertyOrder": 3,
+          "options": {
+            "dependencies": {
+              "account_type": "sharepoint"
+            }
+          }
+        },
+        "library_name": {
+          "type": "string",
+          "title": "Library Name (optional)",
+          "description": "Name of the Document Library to download the data from.",
+          "propertyOrder": 4,
           "options": {
             "dependencies": {
               "account_type": "sharepoint"
             },
             "async": {
-              "label": "List Sites",
-              "action": "listSites"
+              "label": "List Libraries",
+              "action": "listLibraries"
             }
           },
-          "propertyOrder": 3
+          "items": {
+              "enum": [],
+              "type": "string"
+          },
+          "enum": []
         }
       }
     }

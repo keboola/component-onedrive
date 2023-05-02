@@ -4,6 +4,8 @@ import fnmatch
 import os
 from datetime import datetime
 import backoff
+from urllib.parse import urlparse
+
 from client import exceptions
 
 
@@ -12,32 +14,34 @@ class OneDriveClientException(Exception):
 
 
 class OneDriveClient:
-    def __init__(self, refresh_token, files_out_folder, client_id, client_secret, tenant_id=None, site_name=None):
+    def __init__(self, refresh_token, files_out_folder, client_id, client_secret, tenant_id=None, site_url=None):
         self.files_out_folder = files_out_folder
         self.refresh_token = refresh_token
         self.access_token = None
         self.client_id = client_id
         self.client_secret = client_secret
         self.tenant_id = tenant_id
-        self.site_name = site_name
+        self.site_url = site_url
         self.client_type, self.authority, self.endpoint, self.scope = self.configure_client()
         if not self.access_token:
             self.get_access_token(refresh_token=refresh_token)
         self.downloaded_files = []
         self.freshest_file_timestamp = None
+        self.file_mask = None
 
     def configure_client(self):
-        if not self.tenant_id and not self.site_name:
+        if not self.tenant_id and not self.site_url:
             return self.configure_onedrive_client()
-        elif self.tenant_id and self.site_name:
+        elif self.tenant_id and self.site_url:
             return self.configure_sharepoint_client()
-        elif self.tenant_id and not self.site_name:
+        elif self.tenant_id and not self.site_url:
             return self.configure_onedrive_for_business_client()
         else:
-            raise OneDriveClientException(f"Unsupported settings: {self.tenant_id}, {self.site_name}")
+            raise OneDriveClientException(f"Unsupported settings: {self.tenant_id}, {self.site_url}")
 
     @staticmethod
     def configure_onedrive_client():
+        logging.info("Initializing OneDrive client")
         client_type = "OneDrive"
         authority = 'https://login.microsoftonline.com/common'
         endpoint = 'https://graph.microsoft.com/v1.0/me'
@@ -45,16 +49,18 @@ class OneDriveClient:
         return client_type, authority, endpoint, scope
 
     def configure_sharepoint_client(self):
+        logging.info("Initializing Sharepoint client")
         client_type = "Sharepoint"
         authority = f'https://login.microsoftonline.com/{self.tenant_id}'
         self.scope = scope = 'https://graph.microsoft.com/Sites.Read.All https://graph.microsoft.com/Files.Read.All'
         # We need access token to get site id and url
         self.get_access_token(refresh_token=self.refresh_token)
-        site_id, site_url = self.get_site_id_and_url(self.site_name)
+        site_id = self.get_site_id_from_url(self.site_url)
         endpoint = f'https://graph.microsoft.com/v1.0/sites/{site_id}'
         return client_type, authority, endpoint, scope
 
     def configure_onedrive_for_business_client(self):
+        logging.info("Initializing OneDriveForBusiness client")
         client_type = "OneDriveForBusiness"
         authority = f'https://login.microsoftonline.com/{self.tenant_id}'
         endpoint = 'https://graph.microsoft.com/v1.0/me/drive'
@@ -95,11 +101,13 @@ class OneDriveClient:
             # Resolve the path to a folder id
             drive_root = f"{self.endpoint}/drive/root"
             headers = {'Authorization': f'Bearer {self.access_token}'}
-            response = requests.get(f"{drive_root}:/{'/'.join(folder_path.split('/')[1:])}:/", headers=headers)
+            url = f"{drive_root}:/{folder_path.lstrip('/')}:/"
+            response = requests.get(url, headers=headers)
             if response.status_code == 200:
                 folder_id = response.json()['id']
             else:
-                raise Exception(f"Error resolving folder path '{folder_path}': {response.status_code}, {response.text}")
+                raise OneDriveClientException(f"Error resolving folder path '{folder_path}': "
+                                              f"{response.status_code}, {response.text}")
 
         folder_path = f"{self.endpoint}/drive/root/children" if folder_id == 'root' else \
             f"{self.endpoint}/drive/items/{folder_id}/children"
@@ -121,11 +129,13 @@ class OneDriveClient:
             # Resolve the path to a folder id
             drive_root = f"{self.endpoint}/root"
             headers = {'Authorization': f'Bearer {self.access_token}'}
-            response = requests.get(f"{drive_root}:/{'/'.join(folder_path.split('/')[1:])}:/", headers=headers)
+            url = f"{drive_root}:/{folder_path.strip('/')}:/"
+            response = requests.get(url, headers=headers)
             if response.status_code == 200:
                 folder_id = response.json()['id']
             else:
-                raise Exception(f"Error resolving folder path '{folder_path}': {response.status_code}, {response.text}")
+                raise OneDriveClientException(f"Error resolving folder path '{folder_path}': "
+                                              f"{response.status_code}, {response.text}")
 
         folder_path = f"{self.endpoint}/root/children" if folder_id == 'root' else \
             f"{self.endpoint}/items/{folder_id}/children"
@@ -140,21 +150,60 @@ class OneDriveClient:
             raise OneDriveClientException(f"Error occurred when getting folder content:"
                                           f" {response.status_code}, {response.text}")
 
-    def list_folder_contents_sharepoint(self, folder_path=None):
-        if folder_path is None or folder_path == '/':
-            folder_id = 'root'
-        else:
-            # Resolve the path to a folder id
-            drive_root = f"{self.endpoint}/drive/root"
-            headers = {'Authorization': f'Bearer {self.access_token}'}
-            response = requests.get(f"{drive_root}:/{'/'.join(folder_path.split('/')[1:])}:/", headers=headers)
-            if response.status_code == 200:
-                folder_id = response.json()['id']
-            else:
-                raise Exception(f"Error resolving folder path '{folder_path}': {response.status_code}, {response.text}")
+    def list_folder_contents_sharepoint(self, folder_path=None, library_name=None):
+        folder_id = None
+        if library_name:
+            if folder_path is None or folder_path == '/':
+                folder_id = 'root'
+            logging.info(f"The component will try to fetch files from library {library_name}")
+            libraries = self.get_sharepoint_document_libraries()
+            library = next((lib for lib in libraries if lib['name'] == library_name), None)
+            if library is None:
+                raise OneDriveClientException(f"Library '{library_name}' not found")
+            library_id = library['id']
 
-        folder_path = f"{self.endpoint}/drive/root/children" if folder_id == 'root' else \
-            f"{self.endpoint}/drive/items/{folder_id}/children"
+            # Get the library's drive
+            headers = {'Authorization': f'Bearer {self.access_token}'}
+            url = f"{self.endpoint}/lists/{library_id}/drive"
+            response = requests.get(url, headers=headers)
+            if response.status_code == 200:
+                library_drive = response.json()
+            else:
+                raise OneDriveClientException(f"Error fetching library drive:"
+                                              f" {response.status_code}, {response.text}")
+            library_drive_id = library_drive['id']
+            if not folder_id:
+                url = f"{self.endpoint}/drives/{library_drive_id}/root:/{folder_path.strip('/')}"
+                response = requests.get(url, headers=headers)
+                if response.status_code == 200:
+                    folder_id = response.json()['id']
+                else:
+                    raise OneDriveClientException(f"Error resolving folder path '{folder_path}': "
+                                                  f"{response.status_code}, {response.text}")
+            if folder_id == 'root':
+                folder_path = f"{self.endpoint}/drives/{library_drive_id}/root/children"
+            else:
+                folder_path = f"{self.endpoint}/drives/{library_drive_id}/items/{folder_id}/children"
+
+        else:
+            logging.info(f"Scanning folder: {folder_path}")
+            if folder_path is None or folder_path == '/':
+                folder_id = 'root'
+            else:
+                drive_root = f"{self.endpoint}/drive/root"
+                headers = {'Authorization': f'Bearer {self.access_token}'}
+                url = f"{drive_root}:/{folder_path.strip('/')}:/"
+                response = requests.get(url, headers=headers)
+                if response.status_code == 200:
+                    folder_id = response.json()['id']
+                else:
+                    raise OneDriveClientException(f"Error resolving folder path '{folder_path}': "
+                                                  f"{response.status_code}, {response.text}")
+
+            if folder_id == 'root':
+                folder_path = f"{self.endpoint}/drive/root/children"
+            else:
+                folder_path = f"{self.endpoint}/drive/items/{folder_id}/children"
 
         headers = {'Authorization': f'Bearer {self.access_token}'}
         response = requests.get(folder_path, headers=headers)
@@ -166,22 +215,34 @@ class OneDriveClient:
             raise OneDriveClientException(f"Error occurred when getting folder content:"
                                           f" {response.status_code}, {response.text}")
 
-    def get_site_id_and_url(self, site_name):
-        """Returns site_id and url for Sharepoint site_name"""
-        search_url = f"https://graph.microsoft.com/v1.0/sites?search={site_name}"
+    def get_site_id_from_url(self, site_url: str):
+        parsed_url = urlparse(site_url)
+        hostname = parsed_url.netloc
+        server_relative_path = parsed_url.path
+
+        api_url = f"https://graph.microsoft.com/v1.0/sites/{hostname}:{server_relative_path}"
         headers = {'Authorization': f'Bearer {self.access_token}'}
-        response = requests.get(search_url, headers=headers)
+        response = requests.get(api_url, headers=headers)
+
         if response.status_code == 200:
-            sites = response.json()['value']
-            if len(sites) > 0:
-                site = sites[0]  # Assuming the first result is the desired site
-                site_id = site['id']
-                site_url = site['webUrl']
-                return site_id, site_url
-            else:
-                raise OneDriveClientException("No site found with the given name")
+            site = response.json()
+            site_id = site['id']
+            return site_id
         else:
-            raise OneDriveClientException(f"Error occurred when searching for the site:"
+            raise OneDriveClientException(f"Error occurred when fetching site information: "
+                                          f"{response.status_code}, {response.text}")
+
+    def get_sharepoint_document_libraries(self):
+        headers = {'Authorization': f'Bearer {self.access_token}'}
+        site_id = self.get_site_id_from_url(self.site_url)
+        url = f"{self.endpoint}/sites/{site_id}/lists"
+        response = requests.get(url, headers=headers)
+
+        if response.status_code == 200:
+            libraries = response.json()['value']
+            return libraries
+        else:
+            raise OneDriveClientException(f"Error occurred when getting SharePoint document libraries:"
                                           f" {response.status_code}, {response.text}")
 
     @backoff.on_exception(backoff.expo, Exception, max_tries=6)
@@ -228,80 +289,72 @@ class OneDriveClient:
             logging.warning(f"File {filename} has the same as an already downloaded file. It will be overwritten.")
         self.downloaded_files.append(filename)
 
-    def download_files(self, file_path, output_dir, last_modified_at=None):
-        """
-        Downloads files from a OneDrive folder to a local directory.
+    def download_files(self, file_path, output_dir, last_modified_at=None, library_name: str = None):
+        if not last_modified_at:
+            last_modified_at = datetime.strptime("2000-01-01T00:00:00", "%Y-%m-%dT%H:%M:%S")
 
-        Args:
-            file_path (str): The path of the file to download files from. Use '/' to specify the root folder.
-            output_dir (str): The path of the local directory to save the downloaded files to.
-            sequence of characters, or '?' to match any single character.
-            last_modified_at (datetime.datetime, optional): A datetime object representing the minimum last modified
-            date and time of files to download. If provided, only files that were last modified on or after this date
-            will be downloaded. Defaults to None, meaning all files will be downloaded.
-
-        Returns:
-            None
-
-        Raises:
-            OneDriveClientException: If an error occurs while getting folder contents or downloading a file.
-        """
         folder_path, mask = self.split_path_mask(file_path)
+
         logging.info(f"Downloading files matching mask {mask} from folder {folder_path}")
-        if last_modified_at:
-            logging.info(f"The component will fetch files fresher than {last_modified_at}")
 
         if self.client_type == "Sharepoint":
-            items = self.list_folder_contents_sharepoint(folder_path)
+            items = self.list_folder_contents_sharepoint(folder_path, library_name)
         elif self.client_type == "OneDriveForBusiness":
             items = self.list_folder_contents_ofb(folder_path)
-        else:
+        elif self.client_type == "OneDrive":
             items = self.list_folder_contents(folder_path)
+        else:
+            raise OneDriveClientException(f"Unsupported client type: {self.client_type}")
+
+        folder_mask = None
+        if "*" in mask:
+            if not folder_path == "/":
+                folder_mask = mask.split("*", 1)[0] + "*"
 
         for item in items:
-            if item.get('file') is not None:
-                if fnmatch.fnmatch(item['name'], mask):
-                    last_modified = datetime.fromisoformat(item['lastModifiedDateTime'][:-1])
-                    self.update_freshest_file_timestamp(last_modified)
-                    if last_modified_at and last_modified <= last_modified_at:
-                        # skip downloading the file
-                        logging.info(
-                            f"Skipping file {item['name']} because it was last modified before {last_modified_at}.")
-                        continue
-                    else:
-                        logging.info(f"File {item['name']} will be downloaded.")
+            if item.get('folder') is not None:
+                if folder_mask and not fnmatch.fnmatch(item['name'], folder_mask):
+                    logging.debug(
+                        f"Skipping folder {item['name']} because it doesn't match the folder_mask {folder_mask}")
+                    continue
 
-                    file_url = item['@microsoft.graph.downloadUrl']
-                    output_path = os.path.join(output_dir, item['name'])
-                    self.download_file_from_onedrive_url(file_url, output_path, filename=item["name"])
+                subfolder_file_path = os.path.join(folder_path, item['name'], os.path.basename(mask))
+                self.download_files(subfolder_file_path, output_dir, last_modified_at, library_name)
+            elif item.get('file') is not None:
+                if mask and not fnmatch.fnmatch(item['name'], mask):
+                    logging.debug(f"Skipping file {item['name']} because it doesn't match the mask {mask}")
+                    continue
 
-            elif item.get('folder') is not None:
-                if folder_path == "/":
-                    subfolder_path = f"{folder_path}{item['name']}"
-                else:
-                    subfolder_path = f"{folder_path}/{item['name']}"
-                self.download_files(subfolder_path, output_dir, last_modified_at)
+                last_modified = datetime.fromisoformat(item['lastModifiedDateTime'][:-1])
+                self.update_freshest_file_timestamp(last_modified)
+                if last_modified_at and last_modified <= last_modified_at:
+                    logging.debug(
+                        f"Skipping file {item['name']} because it was last modified before {last_modified_at}.")
+                    continue
 
-    def list_sharepoint_sites(self):
-        sites_url = f"https://graph.microsoft.com/v1.0/{self.tenant_id}/sites?search=*"
-        headers = {'Authorization': f'Bearer {self.access_token}'}
-        response = requests.get(sites_url, headers=headers)
+                file_url = item['@microsoft.graph.downloadUrl']
+                output_path = os.path.join(output_dir, item['name'])
+                self.download_file_from_onedrive_url(file_url, output_path, filename=item["name"])
 
-        if response.status_code == 200:
-            sites_data = response.json()['value']
-            sites_list = []
+    def get_document_libraries(self, site_url):
+        """
+        Retrieves a list of document libraries from a site using the Microsoft Graph API.
 
-            for site in sites_data:
-                site_info = {
-                    'id': site['id'],
-                    'name': site['displayName'],
-                    'url': site['webUrl']
-                }
-                sites_list.append(site_info)
+        :param site_url: The url of the site to retrieve the document libraries from.
+        :return: A list of dictionaries containing the document library metadata.
+        """
+        headers = {
+            'Authorization': 'Bearer ' + self.access_token,
+            'Content-Type': 'application/json'
+        }
 
-            return sites_list
-        else:
-            raise Exception(f"Error occurred when fetching SharePoint sites: {response.status_code}, {response.text}")
+        site_id = self.get_site_id_from_url(site_url)
+
+        url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/drives"
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+
+        return response.json()['value']
 
     @staticmethod
     def split_path_mask(file_path):
@@ -316,6 +369,8 @@ class OneDriveClient:
             if "*" in component:
                 mask = os.sep.join(components[i:])
                 break
+            elif i == len(components) - 1 and "." in component:
+                mask = component
             else:
                 path = os.path.join(path, component)
 

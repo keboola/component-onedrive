@@ -13,11 +13,9 @@ Functionality notes
 Prerequisites
 =============
 
-For personal OneDrive, you only need to do OAuth authorization.
-For Work or School account where SharePoint API is used, additionally to OAuth, you need to know the Tenant ID and site name.
+OAuth authorization is required for personal OneDrive, while for OneDriveForBusiness, you need to know the Tenant ID in addition to OAuth. If you want to use Sharepoint, you will also need to provide the site name.
 
-
-Supported endpoints
+Supported features
 ===================
 
 If you want to request new features, please submit your request to
@@ -26,18 +24,37 @@ If you want to request new features, please submit your request to
 Configuration
 =============
 
-- **account_type**: Account Type
-- **tenant_id**: Tenant ID. You can find the Tenant ID in the Azure Portal. After signing in, click on 'Azure Active Directory' in the left-hand menu. The Tenant ID can be found in the 'Tenant information' section on the 'Azure Active Directory' overview page.
-- **site_name**: Site Name. You can find the site name in the url address when you visit your SharePoint or OneDrive for Business.
-- **folder**: Folder (optional). Folder to search and download the files from.
-- **mask**: Mask (optional). Examples: \*, report_\*.xlsx, \*.csv
-- **last_modified_at**: Last Modified At (optional). Date from which data is downloaded. Either date in YYYY-MM-DD format or dateparser string i.e. 5 days ago, 1 month ago, yesterday, etc. You can also set this as last run, which will fetch data from the last run of the component.
+- **account_type**: Account Type - This field is only used in GUI to display relevant fields for different Account types.
+- **tenant_id**: Tenant ID is needed for OneDrive for Business and SharePoint. You can find the Tenant ID in the Azure Portal. After signing in, click on 'Azure Active Directory' in the left-hand menu. The Tenant ID can be found in the 'Tenant information' section on the 'Azure Active Directory' overview page.
+- **site_url**: Site URL is only needed for SharePoint. You can find the site name in the url address when you visit your SharePoint online.
+- **library_name**: Library name (optional) is used to select Document Library from which you want to download files from. If you do not wish to download files from Document Library, leave this field empty.
+- **file_path**: Path to file/s you want to download from selected service. Supports wildcards.
+     - Examples: 
+       - \*.csv - Downloads all available csv files.
+       - /reports/\*.csv - Downloads all available csv files from reports folder and it's subfolders.
+       - db_exports/report_\*.xlsx - Downloads all .xlsx files that are named like report_\* (\* is wildcard) from db_exports folder and it's subfolders. 
+       - db_exports/2022_\*/\*.csv - Downloads all csv files from folders matching db_exports/2022_\* (\* is wildcard) 
+- **new_files_only**: New Files Only (optional). If set to true, the component will use timestamp of the freshest file downloaded last run to download only newer files. LastModifiedAt value from GraphAPI is used.
 - **custom_tag**: Custom Tag (optional). Adds custom tag to Keboola Storage for all downloaded files. Only one custom tag is supported.
 
-Output
+Example Configuration
 ======
 
-List of tables, foreign keys, schema.
+```json
+{
+   "account":{
+      "tenant_id":"xxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "account_type":"onedrive_for_business"
+   },
+   "settings":{
+      "file_path":"/extractor-test/wildcard_in_path/*.png",
+      "new_files_only":false
+   },
+   "destination":{
+      "custom_tag":"odb_test"
+   }
+}
+```
 
 Development
 -----------
