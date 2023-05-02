@@ -59,15 +59,15 @@
             "dependencies": {
               "account_type": "sharepoint"
             },
-                        "async": {
-              "label": "List Sites",
-              "action": "listSites"
+            "async": {
+              "label": "List Libraries",
+              "action": "listLibraries"
             },
-                      "items": {
-            "enum": [],
-            "type": "string"
-          },
-          "enum": []
+            "items": {
+              "enum": [],
+              "type": "string"
+            },
+            "enum": []
           }
         }
       }
