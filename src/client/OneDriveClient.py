@@ -134,7 +134,8 @@ class OneDriveClient:
             if response.status_code == 200:
                 folder_id = response.json()['id']
             else:
-                raise Exception(f"Error resolving folder path '{folder_path}': {response.status_code}, {response.text}")
+                raise OneDriveClientException(f"Error resolving folder path '{folder_path}': "
+                                              f"{response.status_code}, {response.text}")
 
         folder_path = f"{self.endpoint}/root/children" if folder_id == 'root' else \
             f"{self.endpoint}/items/{folder_id}/children"
@@ -289,35 +290,12 @@ class OneDriveClient:
         self.downloaded_files.append(filename)
 
     def download_files(self, file_path, output_dir, last_modified_at=None, library_name: str = None):
-        """
-        Downloads files from a OneDrive folder to a local directory.
-
-        Args:
-            file_path (str): The path of the file to download files from. Use '/' to specify the root folder.
-            output_dir (str): The path of the local directory to save the downloaded files to.
-            sequence of characters, or '?' to match any single character.
-            last_modified_at (datetime.datetime, optional): A datetime object representing the minimum last modified
-            date and time of files to download. If provided, only files that were last modified on or after this date
-            will be downloaded. Defaults to None, meaning all files will be downloaded.
-            library_name (str): if library name is set, uses SharePoint client do download contents of defined library.
-
-        Returns:
-            None
-
-        Raises:
-            OneDriveClientException: If an error occurs while getting folder contents or downloading a file.
-        """
-
         if not last_modified_at:
             last_modified_at = datetime.strptime("2000-01-01T00:00:00", "%Y-%m-%dT%H:%M:%S")
 
-        if not self.file_mask:
-            folder_path, self.file_mask = self.split_path_mask(file_path)
-        else:
-            folder_path, _ = self.split_path_mask(file_path)
+        folder_path, mask = self.split_path_mask(file_path)
 
-        print(f"File path: {file_path}")
-        logging.info(f"Downloading files matching mask {self.file_mask} from folder {folder_path}")
+        logging.info(f"Downloading files matching mask {mask} from folder {folder_path}")
 
         if self.client_type == "Sharepoint":
             items = self.list_folder_contents_sharepoint(folder_path, library_name)
@@ -328,28 +306,35 @@ class OneDriveClient:
         else:
             raise OneDriveClientException(f"Unsupported client type: {self.client_type}")
 
+        folder_mask = None
+        if "*" in mask:
+            if not folder_path == "/":
+                folder_mask = mask.split("*", 1)[0] + "*"
+
         for item in items:
-            if item.get('file') is not None:
-                if fnmatch.fnmatch(item['name'], self.file_mask):
-                    last_modified = datetime.fromisoformat(item['lastModifiedDateTime'][:-1])
-                    self.update_freshest_file_timestamp(last_modified)
-                    if last_modified_at and last_modified <= last_modified_at:
-                        # skip downloading the file
-                        logging.info(
-                            f"Skipping file {item['name']} because it was last modified before {last_modified_at}.")
-                        continue
+            if item.get('folder') is not None:
+                if folder_mask and not fnmatch.fnmatch(item['name'], folder_mask):
+                    logging.debug(
+                        f"Skipping folder {item['name']} because it doesn't match the folder_mask {folder_mask}")
+                    continue
 
-                    file_url = item['@microsoft.graph.downloadUrl']
-                    output_path = os.path.join(output_dir, item['name'])
-                    self.download_file_from_onedrive_url(file_url, output_path, filename=item["name"])
+                subfolder_file_path = os.path.join(folder_path, item['name'], os.path.basename(mask))
+                self.download_files(subfolder_file_path, output_dir, last_modified_at, library_name)
+            elif item.get('file') is not None:
+                if mask and not fnmatch.fnmatch(item['name'], mask):
+                    logging.debug(f"Skipping file {item['name']} because it doesn't match the mask {mask}")
+                    continue
 
-            elif item.get('folder') is not None:
-                if folder_path == "/":
-                    subfolder_path = f"{folder_path}{item['name']}"
-                else:
-                    subfolder_path = f"{folder_path}/{item['name']}"
-                print(f"Subfolder path: {subfolder_path}")
-                self.download_files(subfolder_path, output_dir, last_modified_at, library_name)
+                last_modified = datetime.fromisoformat(item['lastModifiedDateTime'][:-1])
+                self.update_freshest_file_timestamp(last_modified)
+                if last_modified_at and last_modified <= last_modified_at:
+                    logging.debug(
+                        f"Skipping file {item['name']} because it was last modified before {last_modified_at}.")
+                    continue
+
+                file_url = item['@microsoft.graph.downloadUrl']
+                output_path = os.path.join(output_dir, item['name'])
+                self.download_file_from_onedrive_url(file_url, output_path, filename=item["name"])
 
     def get_document_libraries(self, site_url):
         """
@@ -398,8 +383,6 @@ class OneDriveClient:
             path += os.sep
 
         return path, mask
-
-    path, mask = split_path_mask("*logo*.png")
 
     @property
     def get_freshest_file_timestamp(self):
