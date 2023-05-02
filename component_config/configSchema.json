@@ -62,13 +62,13 @@
             "async": {
               "label": "List Libraries",
               "action": "listLibraries"
-            },
-            "items": {
+            }
+          },
+          "items": {
               "enum": [],
               "type": "string"
-            },
-            "enum": []
-          }
+          },
+          "enum": []
         }
       }
     }
