@@ -27,6 +27,7 @@ class OneDriveClient:
             self.get_access_token(refresh_token=refresh_token)
         self.downloaded_files = []
         self.freshest_file_timestamp = None
+        self.file_mask = None
 
     def configure_client(self):
         if not self.tenant_id and not self.site_url:
@@ -310,8 +311,13 @@ class OneDriveClient:
         if not last_modified_at:
             last_modified_at = datetime.strptime("2000-01-01T00:00:00", "%Y-%m-%dT%H:%M:%S")
 
-        folder_path, mask = self.split_path_mask(file_path)
-        logging.info(f"Downloading files matching mask {mask} from folder {folder_path}")
+        if not self.file_mask:
+            folder_path, self.file_mask = self.split_path_mask(file_path)
+        else:
+            folder_path, _ = self.split_path_mask(file_path)
+
+        print(f"File path: {file_path}")
+        logging.info(f"Downloading files matching mask {self.file_mask} from folder {folder_path}")
 
         if self.client_type == "Sharepoint":
             items = self.list_folder_contents_sharepoint(folder_path, library_name)
@@ -324,7 +330,7 @@ class OneDriveClient:
 
         for item in items:
             if item.get('file') is not None:
-                if fnmatch.fnmatch(item['name'], mask):
+                if fnmatch.fnmatch(item['name'], self.file_mask):
                     last_modified = datetime.fromisoformat(item['lastModifiedDateTime'][:-1])
                     self.update_freshest_file_timestamp(last_modified)
                     if last_modified_at and last_modified <= last_modified_at:
@@ -342,6 +348,7 @@ class OneDriveClient:
                     subfolder_path = f"{folder_path}{item['name']}"
                 else:
                     subfolder_path = f"{folder_path}/{item['name']}"
+                print(f"Subfolder path: {subfolder_path}")
                 self.download_files(subfolder_path, output_dir, last_modified_at, library_name)
 
     def get_document_libraries(self, site_url):
@@ -374,9 +381,11 @@ class OneDriveClient:
         mask = ""
 
         for i, component in enumerate(components):
-            if "*" in component or i == len(components) - 1:
+            if "*" in component:
                 mask = os.sep.join(components[i:])
                 break
+            elif i == len(components) - 1 and "." in component:
+                mask = component
             else:
                 path = os.path.join(path, component)
 
@@ -389,6 +398,8 @@ class OneDriveClient:
             path += os.sep
 
         return path, mask
+
+    path, mask = split_path_mask("*logo*.png")
 
     @property
     def get_freshest_file_timestamp(self):

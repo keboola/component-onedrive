@@ -77,9 +77,10 @@ class Component(ComponentBase):
             file_def = self.create_out_file_definition(filename, tags=tags)
             self.write_manifest(file_def)
 
-        freshest_timestamp = client.freshest_file_timestamp.isoformat()
-        self.write_state_file({"last_modified": freshest_timestamp})
-        logging.info(f"Saving freshest file timestamp to statefile: {freshest_timestamp}")
+        if client.freshest_file_timestamp:
+            freshest_timestamp = client.freshest_file_timestamp.isoformat()
+            self.write_state_file({"last_modified": freshest_timestamp})
+            logging.info(f"Saving freshest file timestamp to statefile: {freshest_timestamp}")
 
     def get_client(self, account_params):
         tenant_id = account_params.get(KEY_TENANT_ID, None)
