@@ -374,7 +374,7 @@ class OneDriveClient:
         mask = ""
 
         for i, component in enumerate(components):
-            if "*" in component:
+            if "*" in component or i == len(components) - 1:
                 mask = os.sep.join(components[i:])
                 break
             else:
