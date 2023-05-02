@@ -312,8 +312,6 @@ class OneDriveClient:
 
         folder_path, mask = self.split_path_mask(file_path)
         logging.info(f"Downloading files matching mask {mask} from folder {folder_path}")
-        if last_modified_at:
-            logging.info(f"The component will fetch files fresher than {last_modified_at}")
 
         if self.client_type == "Sharepoint":
             items = self.list_folder_contents_sharepoint(folder_path, library_name)
