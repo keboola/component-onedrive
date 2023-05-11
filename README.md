@@ -36,6 +36,7 @@ Configuration
        - db_exports/2022_\*/\*.csv - Downloads all csv files from folders matching db_exports/2022_\* (\* is wildcard) 
 - **new_files_only**: New Files Only (optional). If set to true, the component will use timestamp of the freshest file downloaded last run to download only newer files. LastModifiedAt value from GraphAPI is used.
 - **custom_tag**: Custom Tag (optional). Adds custom tag to Keboola Storage for all downloaded files. Only one custom tag is supported.
+- **permanent**: Permanent Files (optional). If set to true, downloaded files will be stored as permanent in Keboola storage. Otherwise, they will be deleted after 14 days.
 
 Example Configuration
 ======
@@ -47,11 +48,12 @@ Example Configuration
       "account_type":"onedrive_for_business"
    },
    "settings":{
-      "file_path":"/extractor-test/wildcard_in_path/*.png",
+      "file_path":"/extractor-test/subfolder/*.png",
       "new_files_only":false
    },
    "destination":{
-      "custom_tag":"odb_test"
+      "custom_tag":"odb_test",
+      "permanent": false
    }
 }
 ```
