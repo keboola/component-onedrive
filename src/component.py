@@ -19,6 +19,7 @@ KEY_FILE_PATH = 'file_path'
 KEY_CUSTOM_TAG = 'custom_tag'
 NEW_FILES_ONLY = 'new_files_only'
 KEY_LIBRARY_NAME = 'library_name'
+KEY_PERMANENT = 'permanent'
 
 # List of required parameters
 REQUIRED_PARAMETERS = []
@@ -54,6 +55,10 @@ class Component(ComponentBase):
         tag = destination_params.get(KEY_CUSTOM_TAG, False)
         tags = [tag] if tag else []
 
+        permanent = destination_params.get(KEY_PERMANENT, False)
+        if permanent:
+            logging.info("Downloaded files will be stored as permanent files.")
+
         get_new_only = settings_params.get(NEW_FILES_ONLY, False)
         last_modified_at = False
         if get_new_only:
@@ -74,7 +79,7 @@ class Component(ComponentBase):
             raise UserException(e) from e
 
         for filename in client.downloaded_files:
-            file_def = self.create_out_file_definition(filename, tags=tags)
+            file_def = self.create_out_file_definition(filename, tags=tags, is_permanent=permanent)
             self.write_manifest(file_def)
 
         if client.freshest_file_timestamp:

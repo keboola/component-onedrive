@@ -10,6 +10,7 @@
         "file_path": {
           "type": "string",
           "title": "File path",
+          "default": "*",
           "propertyOrder": 1,
           "description": "Source file path with its extension or wildcard."
         },
@@ -33,6 +34,14 @@
           "title": "Custom Tag (optional)",
           "description": "Adds custom tag to Keboola Storage for all downloaded files.",
           "propertyOrder": 1
+        },
+        "permanent": {
+          "type": "boolean",
+          "title": "Permanent Files (optional)",
+          "default": false,
+          "format": "checkbox",
+          "description": "If set to true, downloaded files will be stored as permanent in Keboola storage. Otherwise, they will be deleted after 14 days.",
+          "propertyOrder": 2
         }
       }
     }
