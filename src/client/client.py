@@ -69,7 +69,7 @@ class OneDriveClient:
         authority = f'https://login.microsoftonline.com/{self.tenant_id}'
         self.scope = 'https://graph.microsoft.com/Sites.Read.All https://graph.microsoft.com/Files.Read.All'
         # We need access token to get site id and url
-        self.base_url = f'https://graph.microsoft.com/v1.0/sites/'
+        self.base_url = 'https://graph.microsoft.com/v1.0/sites/'
         self._get_access_token(refresh_token=self.refresh_token)
         site_id = self.get_site_id_from_url(self.site_url)
         self.base_url = self.base_url + site_id
