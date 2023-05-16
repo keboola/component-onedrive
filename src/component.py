@@ -6,7 +6,7 @@ from keboola.component.base import ComponentBase, sync_action
 from keboola.component.exceptions import UserException
 from keboola.component.sync_actions import SelectElement
 
-from client import OneDriveClient, OneDriveClientException
+from client.client import OneDriveClient, OneDriveClientException
 
 
 # Configuration variables
