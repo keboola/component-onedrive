@@ -6,7 +6,7 @@ from keboola.component.base import ComponentBase, sync_action
 from keboola.component.exceptions import UserException
 from keboola.component.sync_actions import SelectElement
 
-from client.OneDriveClient import OneDriveClient, OneDriveClientException
+from client import OneDriveClient, OneDriveClientException
 
 
 # Configuration variables
@@ -30,11 +30,8 @@ class Component(ComponentBase):
     def __init__(self):
         super().__init__()
         self.refresh_token = self.configuration.oauth_credentials.data["refresh_token"]
-        self.client_id = self.configuration.oauth_credentials["appKey"]
-        self.client_secret = self.configuration.oauth_credentials["appSecret"]
-        self.authorized_for = (
-            self.configuration.config_data["authorization"]["oauth_api"]["credentials"]["authorizedFor"]
-        )
+        self.client_id = self.configuration.oauth_credentials.appKey
+        self.client_secret = self.configuration.oauth_credentials.appSecret
 
     def run(self):
         params = self.configuration.parameters

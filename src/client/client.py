@@ -6,7 +6,7 @@ from datetime import datetime
 import backoff
 from urllib.parse import urlparse
 
-from client import exceptions
+from . import exceptions
 
 
 class OneDriveClientException(Exception):
@@ -394,56 +394,39 @@ class OneDriveClient:
 
     @staticmethod
     def _parse_response(response, endpoint):
-        status_code = response.status_code
-        if 'application/json' in response.headers['Content-Type']:
-            r = response.json()
-        else:
-            r = response.text
-        if status_code in (200, 201, 202):
-            return r
-        elif status_code == 204:
+        content_type = response.headers['Content-Type']
+        result = response.json() if 'application/json' in content_type else response.text
+
+        status_exceptions = {
+            400: exceptions.BadRequest,
+            401: exceptions.Unauthorized,
+            403: exceptions.Forbidden,
+            404: exceptions.NotFound,
+            405: exceptions.MethodNotAllowed,
+            406: exceptions.NotAcceptable,
+            409: exceptions.Conflict,
+            410: exceptions.Gone,
+            411: exceptions.LengthRequired,
+            412: exceptions.PreconditionFailed,
+            413: exceptions.RequestEntityTooLarge,
+            415: exceptions.UnsupportedMediaType,
+            416: exceptions.RequestedRangeNotSatisfiable,
+            422: exceptions.UnprocessableEntity,
+            429: exceptions.TooManyRequests,
+            500: exceptions.InternalServerError,
+            501: exceptions.NotImplemented,
+            503: exceptions.ServiceUnavailable,
+            504: exceptions.GatewayTimeout,
+            507: exceptions.InsufficientStorage,
+            509: exceptions.BandwidthLimitExceeded,
+        }
+
+        if response.status_code in (200, 201, 202):
+            return result
+        elif response.status_code == 204:
             return None
-        elif status_code == 400:
-            raise exceptions.BadRequest(f'Calling endpoint {endpoint} failed', r)
-        elif status_code == 401:
-            raise exceptions.Unauthorized(f'Calling endpoint {endpoint} failed', r)
-        elif status_code == 403:
-            raise exceptions.Forbidden(f'Calling endpoint {endpoint} failed', r)
-        elif status_code == 404:
-            raise exceptions.NotFound(f'Calling endpoint {endpoint} failed', r)
-        elif status_code == 405:
-            raise exceptions.MethodNotAllowed(f'Calling endpoint {endpoint} failed', r)
-        elif status_code == 406:
-            raise exceptions.NotAcceptable(f'Calling endpoint {endpoint} failed', r)
-        elif status_code == 409:
-            raise exceptions.Conflict(f'Calling endpoint {endpoint} failed', r)
-        elif status_code == 410:
-            raise exceptions.Gone(f'Calling endpoint {endpoint} failed', r)
-        elif status_code == 411:
-            raise exceptions.LengthRequired(f'Calling endpoint {endpoint} failed', r)
-        elif status_code == 412:
-            raise exceptions.PreconditionFailed(f'Calling endpoint {endpoint} failed', r)
-        elif status_code == 413:
-            raise exceptions.RequestEntityTooLarge(f'Calling endpoint {endpoint} failed', r)
-        elif status_code == 415:
-            raise exceptions.UnsupportedMediaType(f'Calling endpoint {endpoint} failed', r)
-        elif status_code == 416:
-            raise exceptions.RequestedRangeNotSatisfiable(f'Calling endpoint {endpoint} failed', r)
-        elif status_code == 422:
-            raise exceptions.UnprocessableEntity(f'Calling endpoint {endpoint} failed', r)
-        elif status_code == 429:
-            raise exceptions.TooManyRequests(f'Calling endpoint {endpoint} failed', r)
-        elif status_code == 500:
-            raise exceptions.InternalServerError(f'Calling endpoint {endpoint} failed', r)
-        elif status_code == 501:
-            raise exceptions.NotImplemented(f'Calling endpoint {endpoint} failed', r)
-        elif status_code == 503:
-            raise exceptions.ServiceUnavailable(f'Calling endpoint {endpoint} failed', r)
-        elif status_code == 504:
-            raise exceptions.GatewayTimeout(f'Calling endpoint {endpoint} failed', r)
-        elif status_code == 507:
-            raise exceptions.InsufficientStorage(f'Calling endpoint {endpoint} failed', r)
-        elif status_code == 509:
-            raise exceptions.BandwidthLimitExceeded(f'Calling endpoint {endpoint} failed', r)
+        elif response.status_code in status_exceptions:
+            raise status_exceptions[response.status_code](f'Calling endpoint {endpoint} failed', result)
         else:
-            raise exceptions.UnknownError(f'Calling endpoint {endpoint} failed', r)
+            raise exceptions.UnknownError(f'Calling endpoint {endpoint} failed', result)
+
