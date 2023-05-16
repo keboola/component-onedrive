@@ -32,6 +32,7 @@ class Component(ComponentBase):
         self.refresh_token = self.configuration.oauth_credentials.data["refresh_token"]
         self.client_id = self.configuration.oauth_credentials.appKey
         self.client_secret = self.configuration.oauth_credentials.appSecret
+        self.set_debug_mode()
 
     def run(self):
         params = self.configuration.parameters
