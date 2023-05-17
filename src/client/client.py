@@ -323,7 +323,7 @@ class OneDriveClient:
         site_id = self.get_site_id_from_url(site_url)
 
         url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/drives"
-        response = self.graph_client.get(url, is_absolute_path=True)
+        response = self.graph_client.get_raw(url, is_absolute_path=True)
 
         try:
             response.raise_for_status()
