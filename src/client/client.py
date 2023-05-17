@@ -18,8 +18,8 @@ class OneDriveClientException(Exception):
 
 class OneDriveClient:
     """
-    The OneDriveClient class manages the interaction with OneDrive API. It handles tasks such as 
-    authenticating the client, configuring the client type (OneDrive, SharePoint, or OneDrive for Business), 
+    The OneDriveClient class manages the interaction with OneDrive API. It handles tasks such as
+    authenticating the client, configuring the client type (OneDrive, SharePoint, or OneDrive for Business),
     and managing file downloads. Currently, there is a limit to runtime of 60 minutes, because of expiration
     of access_token.
 
