@@ -65,7 +65,7 @@ class Component(ComponentBase):
             self.write_state_file({"last_modified": freshest_timestamp})
             logging.info(f"Saving freshest file timestamp to statefile: {freshest_timestamp}")
         else:
-            logging.warning(f"The component has not found and files matching filename: {file_path}")
+            logging.warning(f"The component has not found any files matching filename: {file_path}")
 
     def _create_manifests(self, client) -> None:
 
