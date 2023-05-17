@@ -1,13 +1,13 @@
 import logging
 from datetime import datetime
-from typing import List
+from typing import List, Union, Any
 
 from keboola.component.base import ComponentBase, sync_action
 from keboola.component.exceptions import UserException
 from keboola.component.sync_actions import SelectElement
 
 from client.client import OneDriveClient, OneDriveClientException
-from configuration import Configuration, Account, Settings, Destination
+from configuration import Configuration, Account
 
 # Configuration variables
 KEY_GROUP_ACCOUNT = 'account'
@@ -59,7 +59,7 @@ class Component(ComponentBase):
         self._create_manifests(client)
         self._save_timestamp(client, file_path)
 
-    def _save_timestamp(self, client, file_path):
+    def _save_timestamp(self, client, file_path) -> None:
         if client.freshest_file_timestamp:
             freshest_timestamp = client.freshest_file_timestamp.isoformat()
             self.write_state_file({"last_modified": freshest_timestamp})
@@ -80,7 +80,7 @@ class Component(ComponentBase):
             file_def = self.create_out_file_definition(filename, tags=tags, is_permanent=permanent)
             self.write_manifest(file_def)
 
-    def _set_last_modified(self, statefile):
+    def _set_last_modified(self, statefile) -> Union[str, Any]:
         get_new_only = self._configuration.settings.new_files_only
         last_modified_at = False
         if get_new_only:
@@ -97,7 +97,7 @@ class Component(ComponentBase):
         self.validate_configuration_parameters(Configuration.get_dataclass_required_parameters())
         self._configuration: Configuration = Configuration.load_from_dict(self.configuration.parameters)
 
-    def _get_client(self, account_params: Account):
+    def _get_client(self, account_params: Account) -> OneDriveClient:
         tenant_id = account_params.tenant_id
         site_url = account_params.site_url
         try:

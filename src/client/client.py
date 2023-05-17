@@ -17,6 +17,27 @@ class OneDriveClientException(Exception):
 
 
 class OneDriveClient:
+    """
+    The OneDriveClient class manages the interaction with OneDrive API. It handles tasks such as 
+    authenticating the client, configuring the client type (OneDrive, SharePoint, or OneDrive for Business), 
+    and managing file downloads. Currently, there is a limit to runtime of 60 minutes, because of expiration
+    of access_token.
+
+    Parameters:
+    ----------
+    refresh_token : str
+        The token used to refresh the client's access to the OneDrive API.
+    files_out_folder : str
+        The directory path where downloaded files will be stored.
+    client_id : str
+        The ID assigned to the client by the OneDrive API.
+    client_secret : str
+        The secret key assigned to the client by the OneDrive API.
+    tenant_id : str, optional
+        The ID of the tenant, if the client is a business account (default is None).
+    site_url : str, optional
+        The URL of the SharePoint site, if the client is configured for SharePoint (default is None).
+    """
     MAX_RETRIES = 5
 
     def __init__(self, refresh_token, files_out_folder, client_id, client_secret, tenant_id=None, site_url=None):
