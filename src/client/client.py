@@ -51,20 +51,18 @@ class OneDriveClient(HttpClient):
         self.tenant_id = tenant_id
         self.site_url = site_url
         self.access_token = ""
-        self.auth_header = {}
 
         self.client_type, self.authority, self.scope = self._configure_client()
 
-        if not self.access_token or not self.auth_header:
+        if not self.access_token:
             self._get_access_token()
-            self.auth_header = {"Authorization": 'Bearer ' + self.access_token, "Content-Type": "application/json"}
 
         self.downloaded_files = []
         self.freshest_file_timestamp = None
         self.file_mask = None
 
         super().__init__(base_url=self.base_url, max_retries=self.MAX_RETRIES, backoff_factor=0.3,
-                         auth_header=self.auth_header, status_forcelist=(429, 503, 500, 502, 504))
+                         status_forcelist=(429, 503, 500, 502, 504))
 
     def _configure_client(self):
         if not self.tenant_id and not self.site_url:
@@ -108,13 +106,7 @@ class OneDriveClient(HttpClient):
         """
         This is handled using requests to handle compatibility with OneDrive and Sharepoint client.
         """
-        if self.access_token:
-            headers = {'Authorization': f'Bearer {self.access_token}'}
-            response = requests.get(self.base_url, headers=headers)
-            if response.status_code == 200:
-                logging.info("Access token is valid")
-                return
-
+        logging.info("Fetching New Access token")
         request_url = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
         payload = {
@@ -132,8 +124,11 @@ class OneDriveClient(HttpClient):
             logging.error(response.json())
             raise OneDriveClientException("Authentication failed, "
                                           "reauthorize the extractor in extractor configuration.")
-        logging.info("Access token fetched")
+        logging.info(f"New Access token fetched.")
         self.access_token = response.json()["access_token"]
+
+        new_header = {"Authorization": 'Bearer ' + self.access_token, "Content-Type": "application/json"}
+        self.update_auth_header(updated_header=new_header, overwrite=True)
 
     def get_request(self, url: str, is_absolute_path: bool, stream: bool = False):
         response = self.get_raw(url, is_absolute_path=is_absolute_path, stream=stream)
@@ -238,8 +233,7 @@ class OneDriveClient(HttpClient):
         server_relative_path = parsed_url.path
 
         url = f"https://graph.microsoft.com/v1.0/sites/{hostname}:{server_relative_path}"
-        headers = {'Authorization': f'Bearer {self.access_token}'}
-        response = requests.get(url, headers=headers)
+        response = requests.get(url, headers=self._auth_header)
 
         if response.status_code == 200:
             site = response.json()
