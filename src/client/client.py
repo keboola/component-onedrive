@@ -5,6 +5,8 @@ import os
 from datetime import datetime
 import backoff
 from urllib.parse import urlparse
+from urllib3.util.retry import Retry
+from requests.adapters import HTTPAdapter
 from requests.exceptions import HTTPError
 
 from keboola.http_client import HttpClient
@@ -16,7 +18,7 @@ class OneDriveClientException(Exception):
     pass
 
 
-class OneDriveClient:
+class OneDriveClient(HttpClient):
     """
     The OneDriveClient class manages the interaction with OneDrive API. It handles tasks such as
     authenticating the client, configuring the client type (OneDrive, SharePoint, or OneDrive for Business),
@@ -56,15 +58,45 @@ class OneDriveClient:
         self.client_type, self.authority, self.scope = self._configure_client()
 
         if not self.access_token or not self.auth_header:
-            self._get_access_token(refresh_token=refresh_token)
+            self._get_access_token()
             self.auth_header = {"Authorization": 'Bearer ' + self.access_token, "Content-Type": "application/json"}
 
         self.downloaded_files = []
         self.freshest_file_timestamp = None
         self.file_mask = None
 
-        self.graph_client = HttpClient(base_url=self.base_url, max_retries=self.MAX_RETRIES, backoff_factor=0.3,
-                                       auth_header=self.auth_header, status_forcelist=(429, 503, 500, 502, 504))
+        super().__init__(base_url=self.base_url, max_retries=self.MAX_RETRIES, backoff_factor=0.3,
+                         auth_header=self.auth_header, status_forcelist=(429, 503, 500, 502, 504))
+
+    def __response_hook(self, res, *args, **kwargs):
+        # refresh token if expired
+        if res.status_code == 401:
+            self._get_access_token()
+            # update auth header
+            self._auth_header = {"Authorization": 'Bearer ' + self.access_token,
+                                 "Content-Type": "application/json"}
+            # reset header
+            res.request.headers['Authorization'] = 'Bearer ' + self.access_token
+            s = requests.Session()
+            # retry request
+            return self.requests_retry_session(session=s).send(res.request)
+
+    def requests_retry_session(self, session=None):
+        session = session or requests.Session()
+        retry = Retry(
+            total=self.max_retries,
+            read=self.max_retries,
+            connect=self.max_retries,
+            backoff_factor=self.backoff_factor,
+            status_forcelist=self.status_forcelist,
+            method_whitelist=('GET', 'POST', 'PATCH', 'UPDATE')
+        )
+        adapter = HTTPAdapter(max_retries=retry)
+        session.mount('http://', adapter)
+        session.mount('https://', adapter)
+        # append response hook
+        session.hooks['response'].append(self.__response_hook)
+        return session
 
     def _configure_client(self):
         if not self.tenant_id and not self.site_url:
@@ -91,7 +123,7 @@ class OneDriveClient:
         self.scope = 'https://graph.microsoft.com/Sites.Read.All https://graph.microsoft.com/Files.Read.All'
         # We need access token to get site id and url
         self.base_url = 'https://graph.microsoft.com/v1.0/sites/'
-        self._get_access_token(refresh_token=self.refresh_token)
+        self._get_access_token()
         site_id = self.get_site_id_from_url(self.site_url)
         self.base_url = self.base_url + site_id
         return client_type, authority, self.scope
@@ -104,7 +136,7 @@ class OneDriveClient:
         scope = 'https://graph.microsoft.com/Sites.Read.All https://graph.microsoft.com/Files.Read.All'
         return client_type, authority, scope
 
-    def _get_access_token(self, refresh_token: str) -> None:
+    def _get_access_token(self) -> None:
         """
         This is handled using requests to handle compatibility with OneDrive and Sharepoint client.
         """
@@ -122,7 +154,7 @@ class OneDriveClient:
             "client_secret": self.client_secret,
             "scope": self.scope,
             "grant_type": "refresh_token",
-            "refresh_token": refresh_token,
+            "refresh_token": self.refresh_token,
         }
 
         response = requests.post(url=request_url, headers=headers, data=payload)
@@ -130,7 +162,8 @@ class OneDriveClient:
         token = response.json().get("access_token", None)
         if not token:
             logging.error(response.json())
-            raise OneDriveClientException("Cannot fetch Access token")
+            raise OneDriveClientException("Authentication failed, "
+                                          "reauthorize the extractor in extractor configuration.")
         logging.info("Access token fetched")
         self.access_token = response.json()["access_token"]
 
@@ -141,7 +174,7 @@ class OneDriveClient:
             # Resolve the path to a folder id
             drive_root = f"{self.base_url}/{drive_type if drive_type == 'ofb' else 'drive/root'}"
             url = f"{drive_root}:/{folder_path.lstrip('/')}:/"
-            response = self.graph_client.get(url, is_absolute_path=True)
+            response = self.get_raw(url, is_absolute_path=True)
             if response.status_code == 200:
                 folder_id = response.json()['id']
             else:
@@ -155,7 +188,7 @@ class OneDriveClient:
             drive_or_ofb = 'drive' if drive_type != 'ofb' else drive_type
             folder_path = f"{self.base_url}/{drive_or_ofb}/items/{folder_id}/children"
 
-        response = self.graph_client.get_raw(folder_path, is_absolute_path=True)
+        response = self.get_raw(folder_path, is_absolute_path=True)
 
         if response.status_code == 200:
             items = response.json()['value']
@@ -189,7 +222,7 @@ class OneDriveClient:
 
     def _get_sharepoint_library_drive_id(self, library_id):
         url = f"{self.base_url}/lists/{library_id}/drive"
-        response = self.graph_client.get_raw(url, is_absolute_path=True)
+        response = self.get_raw(url, is_absolute_path=True)
         if response.status_code == 200:
             return response.json()['id']
         else:
@@ -198,7 +231,7 @@ class OneDriveClient:
 
     def _get_folder_id_from_path(self, library_drive_id, folder_path):
         url = f"{self.base_url}/drives/{library_drive_id}/root:/{folder_path.strip('/')}"
-        response = self.graph_client.get_raw(url, is_absolute_path=True)
+        response = self.get_raw(url, is_absolute_path=True)
         if response.status_code == 200:
             return response.json()['id']
         else:
@@ -212,7 +245,7 @@ class OneDriveClient:
             return f"{self.base_url}/drives/{library_drive_id}/items/{folder_id}/children"
 
     def _get_folder_contents_sharepoint(self, folder_path):
-        response = self.graph_client.get_raw(folder_path, is_absolute_path=True)
+        response = self.get_raw(folder_path, is_absolute_path=True)
         if response.status_code == 200:
             return response.json()['value']
         else:
@@ -239,7 +272,7 @@ class OneDriveClient:
     def _get_sharepoint_document_libraries(self):
         site_id = self.get_site_id_from_url(self.site_url)
         url = f"{self.base_url}/sites/{site_id}/lists"
-        response = self.graph_client.get_raw(url, is_absolute_path=True)
+        response = self.get_raw(url, is_absolute_path=True)
 
         if response.status_code == 200:
             libraries = response.json()['value']
@@ -272,7 +305,7 @@ class OneDriveClient:
             This method does not retry in cases where the error is not recoverable, such as when the provided
             download URL is invalid or the local file system runs out of space.
         """
-        response = self.graph_client.get_raw(url, is_absolute_path=True, stream=True)
+        response = self.get_raw(url, is_absolute_path=True, stream=True)
 
         try:
             parsed_response = self._parse_response(response, url)
@@ -344,7 +377,7 @@ class OneDriveClient:
         site_id = self.get_site_id_from_url(site_url)
 
         url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/drives"
-        response = self.graph_client.get_raw(url, is_absolute_path=True)
+        response = self.get_raw(url, is_absolute_path=True)
 
         try:
             response.raise_for_status()
