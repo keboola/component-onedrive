@@ -139,6 +139,7 @@ class OneDriveClient(HttpClient):
             return self.get_request(url, is_absolute_path, stream)
         elif response.status_code == 404:
             logging.error(f"Url {url} returned 404.")
+            return None
         else:
             raise OneDriveClientException(f"Cannot fetch {url}, "
                                           f"response: {response.text}, "
@@ -257,7 +258,7 @@ class OneDriveClient(HttpClient):
             raise OneDriveClientException(f"Error occurred when getting SharePoint document libraries:"
                                           f" {response.status_code}, {response.text}")
 
-    @backoff.on_exception(backoff.expo, Exception, max_tries=6)
+    @backoff.on_exception(backoff.expo, Exception, max_tries=MAX_RETRIES)
     def _download_file_from_onedrive_url(self, url, output_path, filename):
         """
         Downloads a file from OneDrive using the provided download URL and saves it to the specified output path.
