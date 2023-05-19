@@ -124,7 +124,7 @@ class OneDriveClient(HttpClient):
             logging.error(response.json())
             raise OneDriveClientException("Authentication failed, "
                                           "reauthorize the extractor in extractor configuration.")
-        logging.info(f"New Access token fetched.")
+        logging.info("New Access token fetched.")
         self.access_token = response.json()["access_token"]
 
         new_header = {"Authorization": 'Bearer ' + self.access_token, "Content-Type": "application/json"}
