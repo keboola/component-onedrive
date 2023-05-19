@@ -137,6 +137,8 @@ class OneDriveClient(HttpClient):
         elif response.status_code == 401:
             self._get_access_token()
             return self.get_request(url, is_absolute_path, stream)
+        elif response.status_code == 404:
+            logging.error(f"Url {url} returned 404.")
         else:
             raise OneDriveClientException(f"Cannot fetch {url}, "
                                           f"response: {response.text}, "
@@ -259,42 +261,52 @@ class OneDriveClient(HttpClient):
     def _download_file_from_onedrive_url(self, url, output_path, filename):
         """
         Downloads a file from OneDrive using the provided download URL and saves it to the specified output path.
-
-        Args:
-            url (str): The download URL for the file on OneDrive.
-            output_path (str): The path where the downloaded file will be saved.
-            filename (str): The name of the file being downloaded.
-
-        Raises:
-            Exception: If an error occurs while downloading the file or if the response status code is not 200.
-
-        Retry behavior:
-            The method will retry up to 6 times with an exponential backoff strategy in the following cases:
-                - Any exception is raised during the download process.
-                - An error occurs while downloading the file and the response status code is not 200.
-            If the maximum number of retries is reached and the error persists, the method will raise an exception
-            and the download will be considered as failed.
-
-        Note:
-            This method does not retry in cases where the error is not recoverable, such as when the provided
-            download URL is invalid or the local file system runs out of space.
         """
         response = self.get_request(url, is_absolute_path=True, stream=True)
 
+        if response is None:
+            self._handle_no_response(filename)
+            return
+
+        if response.status_code != 200:
+            self._handle_invalid_status_code(response.status_code, filename)
+            return
+
         try:
             parsed_response = self._parse_response(response, url, filename)
-            if parsed_response is not None:
-                with open(output_path, "wb") as f:
-                    for chunk in response.iter_content(chunk_size=32768):
-                        f.write(chunk)
-                logging.info(f"File {filename} downloaded.")
-            else:
-                logging.warning(f"No content in the response for file {filename}.")
+            if parsed_response is None:
+                self._handle_no_content(filename)
+                return
+
+            self._write_content_to_file(response, output_path)
+            logging.info(f"File {filename} downloaded.")
         except OneDriveClientException as e:
             raise e
 
+        self._handle_existing_file(filename)
+
+    @staticmethod
+    def _handle_no_response(filename):
+        logging.error(f"Cannot download file {filename}, got no response from OneDrive API.")
+
+    @staticmethod
+    def _handle_invalid_status_code(status_code, filename):
+        logging.error(f"Cannot download file {filename}, received {status_code} from OneDrive API.")
+
+    @staticmethod
+    def _handle_no_content(filename):
+        logging.warning(f"No content in the response for file {filename}.")
+
+    @staticmethod
+    def _write_content_to_file(response, output_path):
+        with open(output_path, "wb") as f:
+            for chunk in response.iter_content(chunk_size=32768):
+                f.write(chunk)
+
+    def _handle_existing_file(self, filename):
         if filename in self.downloaded_files:
-            logging.warning(f"File {filename} has the same as an already downloaded file. It will be overwritten.")
+            logging.warning(f"File {filename} has the same as an already downloaded file. "
+                            f"It will be overwritten.")
         self.downloaded_files.append(filename)
 
     def _get_items_based_on_client_type(self, folder_path, library_name):
