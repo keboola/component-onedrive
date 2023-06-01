@@ -236,10 +236,11 @@ class OneDriveClient(HttpClient):
         server_relative_path = parsed_url.path
 
         url = f"https://graph.microsoft.com/v1.0/sites/{hostname}:{server_relative_path}"
-        print(url)
-        print(f"Header: {self._auth_header}")
-        response = requests.get(url, headers=self._auth_header)
+        auth_header_str = str(self._auth_header)
+        print(f"Header: {auth_header_str[:20]}{auth_header_str[-60:]}")
         exit()
+
+        response = requests.get(url, headers=self._auth_header)
 
         if response.status_code == 200:
             site = response.json()
