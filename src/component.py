@@ -114,7 +114,14 @@ class Component(ComponentBase):
         self._init_configuration()
         client = self._get_client(self._configuration.account)
         libraries = client.get_document_libraries(self._configuration.account.site_url)
-        return [SelectElement(label=library['name'], value=library['name']) for library in libraries]
+
+        return [
+            SelectElement(
+                label=library['name'],
+                value="Shared Documents" if library['name'] == "Documents" else library['webUrl'].split("/")[-1]
+            )
+            for library in libraries
+        ]
 
 
 # Main entrypoint
