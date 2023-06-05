@@ -145,20 +145,20 @@ class OneDriveClient(HttpClient):
                                           f"response: {response.text}, "
                                           f"status_code: {response.status_code}")
 
-    def _list_folder_contents(self, drive_type: str, folder_path=None):
+    def _resolve_folder_id(self, drive_type: str, folder_path: str):
         if folder_path is None or folder_path == '/':
-            folder_id = 'root'
-        else:
-            # Resolve the path to a folder id
-            drive_root = f"{self.base_url}/{'root' if drive_type == 'ofb' else 'drive/root'}"
-            url = f"{drive_root}:/{folder_path.strip('/')}:/"
-            response = self.get_request(url, is_absolute_path=True)
-            if response.status_code == 200:
-                folder_id = response.json()['id']
-            else:
-                raise OneDriveClientException(f"Error resolving folder path '{folder_path}': "
-                                              f"{response.status_code}, {response.text}")
+            return 'root'
 
+        drive_root = f"{self.base_url}/{'root' if drive_type == 'ofb' else 'drive/root'}"
+        url = f"{drive_root}:/{folder_path.strip('/')}:/"
+        response = self.get_request(url, is_absolute_path=True)
+        if response.status_code == 200:
+            return response.json()['id']
+        else:
+            raise OneDriveClientException(f"Error resolving folder path '{folder_path}': "
+                                          f"{response.status_code}, {response.text}")
+
+    def _get_folder_contents(self, drive_type: str, folder_id: str):
         if folder_id == 'root':
             root_or_drive = 'drive/root' if drive_type != 'ofb' else 'root'
             folder_path = f"{self.base_url}/{root_or_drive}/children"
@@ -175,6 +175,10 @@ class OneDriveClient(HttpClient):
             raise OneDriveClientException(f"Error occurred when getting folder content:"
                                           f" {response.status_code}, {response.text}")
 
+    def _list_folder_contents(self, drive_type: str, folder_path=None):
+        folder_id = self._resolve_folder_id(drive_type, folder_path)
+        return self._get_folder_contents(drive_type, folder_id)
+
     def _list_folder_contents_sharepoint(self, folder_path=None, library_name=None):
         folder_id = 'root' if folder_path is None or folder_path == '/' else None
         if library_name:
@@ -182,15 +186,15 @@ class OneDriveClient(HttpClient):
             library_id = self._get_sharepoint_library_id(library_name)
             library_drive_id = self._get_sharepoint_library_drive_id(library_id)
             if not folder_id:
-                folder_id = self._get_folder_id_from_path(library_drive_id, folder_path)
-            folder_path = self._make_folder_path(folder_id, library_drive_id)
+                folder_id = self._get_sharepoint_folder_id_from_path(library_drive_id, folder_path)
+            folder_path = self._make_library_folder_path(folder_id, library_drive_id)
         else:
             logging.info(f"Scanning folder: {folder_path}")
             if folder_id == "root":
                 folder_path = f"{self.base_url}/drive/root/children"
             else:
                 folder_path = f"{self.base_url}/drive/root:/{folder_path}"
-                folder_id = self._get_folder_id_from_path("", folder_path)
+                folder_id = self._get_sharepoint_folder_id_from_path("", folder_path)
                 folder_path = f"{self.base_url}/drive/items/{folder_id}/children"
 
             logging.debug(f"Folder path set to: {folder_path}")
@@ -199,7 +203,7 @@ class OneDriveClient(HttpClient):
 
         return folder_content
 
-    def _get_folder_id_from_path(self, library_drive_id, folder_path):
+    def _get_sharepoint_folder_id_from_path(self, library_drive_id, folder_path):
         if library_drive_id:
             url = f"{self.base_url}/drives/{library_drive_id}/root:/{folder_path.strip('/')}"
         else:
@@ -228,7 +232,7 @@ class OneDriveClient(HttpClient):
             raise OneDriveClientException(f"Error fetching library drive:"
                                           f" {response.status_code}, {response.text}")
 
-    def _make_folder_path(self, folder_id, library_drive_id: str = ""):
+    def _make_library_folder_path(self, folder_id, library_drive_id: str = ""):
         if folder_id == 'root':
             return f"{self.base_url}/drives/{library_drive_id}/root/children"
         else:
@@ -372,8 +376,14 @@ class OneDriveClient(HttpClient):
         """
         Retrieves a list of document libraries from a site using the Microsoft Graph API.
 
-        :param site_url: The url of the site to retrieve the document libraries from.
-        :return: A list of dictionaries containing the document library metadata.
+        Args:
+            site_url (str): The URL of the site to retrieve the document libraries from.
+
+        Returns:
+            list: A list of dictionaries containing the document library metadata.
+
+        Raises:
+            OneDriveClientException: If an error occurs while retrieving the document libraries.
         """
         site_id = self.get_site_id_from_url(site_url)
 
@@ -471,6 +481,8 @@ class OneDriveClient(HttpClient):
         elif response.status_code == 204:
             return None
         elif response.status_code in status_exceptions:
-            raise status_exceptions[response.status_code](f'Calling endpoint {endpoint} failed', result)
+            raise OneDriveClientException(f'Calling endpoint {endpoint} failed: {result}') from status_exceptions[
+                response.status_code]
         else:
-            raise exceptions.UnknownError(f'Calling endpoint {endpoint} failed', result)
+            raise OneDriveClientException(f'Calling endpoint {endpoint} failed: {result}') from exceptions.UnknownError
+
