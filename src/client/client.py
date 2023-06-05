@@ -485,4 +485,3 @@ class OneDriveClient(HttpClient):
                 response.status_code]
         else:
             raise OneDriveClientException(f'Calling endpoint {endpoint} failed: {result}') from exceptions.UnknownError
-
