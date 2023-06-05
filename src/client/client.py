@@ -150,8 +150,8 @@ class OneDriveClient(HttpClient):
             folder_id = 'root'
         else:
             # Resolve the path to a folder id
-            drive_root = f"{self.base_url}/{drive_type if drive_type == 'ofb' else 'drive/root'}"
-            url = f"{drive_root}:/{folder_path.lstrip('/')}:/"
+            drive_root = f"{self.base_url}/{'root' if drive_type == 'ofb' else 'drive/root'}"
+            url = f"{drive_root}:/{folder_path.strip('/')}:/"
             response = self.get_request(url, is_absolute_path=True)
             if response.status_code == 200:
                 folder_id = response.json()['id']
@@ -160,10 +160,10 @@ class OneDriveClient(HttpClient):
                                               f"{response.status_code}, {response.text}")
 
         if folder_id == 'root':
-            root_or_drive = 'drive/root' if drive_type != 'ofb' else drive_type
+            root_or_drive = 'drive/root' if drive_type != 'ofb' else 'root'
             folder_path = f"{self.base_url}/{root_or_drive}/children"
         else:
-            drive_or_ofb = 'drive' if drive_type != 'ofb' else drive_type
+            drive_or_ofb = 'drive' if drive_type != 'ofb' else ''
             folder_path = f"{self.base_url}/{drive_or_ofb}/items/{folder_id}/children"
 
         response = self.get_request(folder_path, is_absolute_path=True)
