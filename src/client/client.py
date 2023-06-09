@@ -152,11 +152,15 @@ class OneDriveClient(HttpClient):
         drive_root = f"{self.base_url}/{'root' if drive_type == 'ofb' else 'drive/root'}"
         url = f"{drive_root}:/{folder_path.strip('/')}:/"
         response = self.get_request(url, is_absolute_path=True)
-        if response.status_code == 200:
-            return response.json()['id']
+
+        if response:
+            if response.status_code == 200:
+                return response.json()['id']
+            else:
+                raise OneDriveClientException(f"Error resolving folder path '{folder_path}': "
+                                              f"{response.status_code}, {response.text}")
         else:
-            raise OneDriveClientException(f"Error resolving folder path '{folder_path}': "
-                                          f"{response.status_code}, {response.text}")
+            raise OneDriveClientException(f"Cannot find {folder_path}. Please verify if this path exists.")
 
     def _get_folder_contents(self, drive_type: str, folder_id: str):
         if folder_id == 'root':
