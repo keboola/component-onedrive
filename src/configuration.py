@@ -67,5 +67,5 @@ class Destination(ConfigurationBase):
 @dataclass
 class Configuration(ConfigurationBase):
     account: Account
-    settings: Settings
-    destination: Destination
+    settings: Optional[Settings]
+    destination: Optional[Destination]

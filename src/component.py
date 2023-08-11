@@ -93,8 +93,9 @@ class Component(ComponentBase):
                                 "set last_modified in statefile manually.")
         return last_modified_at
 
-    def _init_configuration(self) -> None:
-        self.validate_configuration_parameters(Configuration.get_dataclass_required_parameters())
+    def _init_configuration(self, validate: bool = True) -> None:
+        if validate:
+            self.validate_configuration_parameters(Configuration.get_dataclass_required_parameters())
         self._configuration: Configuration = Configuration.load_from_dict(self.configuration.parameters)
 
     def _get_client(self, account_params: Account) -> OneDriveClient:
@@ -111,7 +112,7 @@ class Component(ComponentBase):
 
     @sync_action("listLibraries")
     def list_sharepoint_libraries(self) -> List[SelectElement]:
-        self._init_configuration()
+        self._init_configuration(validate=False)
         client = self._get_client(self._configuration.account)
         libraries = client.get_document_libraries(self._configuration.account.site_url)
 
