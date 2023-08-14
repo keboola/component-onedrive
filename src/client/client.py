@@ -227,8 +227,9 @@ class OneDriveClient(HttpClient):
         if response and response.status_code == 200:
             return response.json()['id']
 
-        raise OneDriveClientException(
-            f"Error resolving folder path '{folder_path}': {response.status_code}, {response.text}")
+        error_message = f"Error resolving folder path '{folder_path}': {response.status_code}, {response.text}" \
+            if response else f"Error resolving folder path '{folder_path}': No response received"
+        raise OneDriveClientException(error_message)
 
     def _get_sharepoint_library_id(self, library_name):
         libraries = self._get_sharepoint_document_libraries()
@@ -240,11 +241,13 @@ class OneDriveClient(HttpClient):
     def _get_sharepoint_library_drive_id(self, library_id):
         url = f"{self.base_url}/lists/{library_id}/drive"
         response = self.get_request(url, is_absolute_path=True)
+
         if response and response.status_code == 200:
             return response.json()['id']
-        else:
-            raise OneDriveClientException(f"Error fetching library drive:"
-                                          f" {response.status_code}, {response.text}")
+
+        error_message = f"Error fetching library drive: {response.status_code}, {response.text}" \
+            if response else "Error fetching library drive: No response received"
+        raise OneDriveClientException(error_message)
 
     def _make_library_folder_path(self, folder_id, library_drive_id: str = ""):
         if folder_id == 'root':
