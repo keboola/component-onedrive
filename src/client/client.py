@@ -162,29 +162,23 @@ class OneDriveClient(HttpClient):
         else:
             raise OneDriveClientException(f"Cannot find {folder_path}. Please verify if this path exists.")
 
-    def _get_folder_contents(self, drive_type: str, folder_id: str):
+    def _get_folder_contents_onedrive(self, drive_type: str, folder_id: str):
         if folder_id == 'root':
             root_or_drive = 'drive/root' if drive_type != 'ofb' else 'root'
-            folder_path = f"{self.base_url}/{root_or_drive}/children"
+            folder_url = f"{self.base_url}/{root_or_drive}/children"
         else:
             drive_or_ofb = 'drive' if drive_type != 'ofb' else ''
-            folder_path = f"{self.base_url}/{drive_or_ofb}/items/{folder_id}/children"
+            folder_url = f"{self.base_url}/{drive_or_ofb}/items/{folder_id}/children"
 
-        response = self.get_request(folder_path, is_absolute_path=True)
-
-        if response.status_code == 200:
-            items = response.json()['value']
-            return items
-        else:
-            raise OneDriveClientException(f"Error occurred when getting folder content:"
-                                          f" {response.status_code}, {response.text}")
+        return self._get_folder_content(folder_url)
 
     def _list_folder_contents(self, drive_type: str, folder_path=None):
         folder_id = self._resolve_folder_id(drive_type, folder_path)
-        return self._get_folder_contents(drive_type, folder_id)
+        return self._get_folder_contents_onedrive(drive_type, folder_id)
 
-    def _list_folder_contents_sharepoint(self, folder_path=None, library_name=None):
+    def _get_folder_contents_sharepoint(self, folder_path=None, library_name=None):
         folder_id = 'root' if folder_path is None or folder_path == '/' else None
+
         if library_name:
             logging.info(f"The component will try to fetch files from library {library_name}")
             library_id = self._get_sharepoint_library_id(library_name)
@@ -203,9 +197,25 @@ class OneDriveClient(HttpClient):
 
             logging.debug(f"Folder path set to: {folder_path}")
 
-        folder_content = self._get_folder_contents_sharepoint(folder_path)
+        folder_content = self._get_folder_content(folder_path)
 
         return folder_content
+
+    def _get_folder_content(self, folder_url: str) -> list:
+        folder_content = []
+        while True:
+            response = self.get_request(folder_url, is_absolute_path=True)
+
+            if response.status_code == 200:
+                folder_content.extend(response.json()['value'])
+            else:
+                raise OneDriveClientException(f"Error occurred when getting folder content:"
+                                              f" {response.status_code}, {response.text}")
+
+            if response.json().get('@odata.nextLink'):
+                folder_url = response.json().get('@odata.nextLink')
+            else:
+                return folder_content
 
     def _get_sharepoint_folder_id_from_path(self, library_drive_id, folder_path):
         if library_drive_id:
@@ -241,14 +251,6 @@ class OneDriveClient(HttpClient):
             return f"{self.base_url}/drives/{library_drive_id}/root/children"
         else:
             return f"{self.base_url}/drives/{library_drive_id}/items/{folder_id}/children"
-
-    def _get_folder_contents_sharepoint(self, folder_path):
-        response = self.get_request(folder_path, is_absolute_path=True)
-        if response.status_code == 200:
-            return response.json()['value']
-        else:
-            raise OneDriveClientException(f"Error occurred when getting folder content:"
-                                          f" {response.status_code}, {response.text}")
 
     def get_site_id_from_url(self, site_url: str):
         parsed_url = urlparse(site_url)
@@ -334,7 +336,7 @@ class OneDriveClient(HttpClient):
 
     def _get_items_based_on_client_type(self, folder_path, library_name):
         if self.client_type == "Sharepoint":
-            return self._list_folder_contents_sharepoint(folder_path, library_name)
+            return self._get_folder_contents_sharepoint(folder_path, library_name)
         elif self.client_type == "OneDriveForBusiness":
             return self._list_folder_contents("ofb", folder_path)
         elif self.client_type == "OneDrive":
