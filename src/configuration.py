@@ -67,5 +67,6 @@ class Destination(ConfigurationBase):
 @dataclass
 class Configuration(ConfigurationBase):
     account: Account
+    # Following objects are with defaults because sync action does not use them.
     settings: Settings = field(default_factory=lambda: Settings("", False))
     destination: Destination = field(default_factory=lambda: Destination("", False))
