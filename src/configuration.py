@@ -1,7 +1,7 @@
 import dataclasses
 import json
-from dataclasses import dataclass
-from typing import List, Optional
+from dataclasses import dataclass, field
+from typing import List
 
 import dataconf
 
@@ -47,9 +47,9 @@ class ConfigurationBase:
 
 @dataclass
 class Account(ConfigurationBase):
-    tenant_id: Optional[str] = None
-    site_url: Optional[str] = None
-    library_name: Optional[str] = None
+    tenant_id: str = ""
+    site_url: str = ""
+    library_name: str = ""
 
 
 @dataclass
@@ -67,5 +67,5 @@ class Destination(ConfigurationBase):
 @dataclass
 class Configuration(ConfigurationBase):
     account: Account
-    settings: Optional[Settings]
-    destination: Optional[Destination]
+    settings: Settings = field(default_factory=lambda: Settings("", False))
+    destination: Destination = field(default_factory=lambda: Destination("", False))
