@@ -1,6 +1,6 @@
 import dataclasses
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List
 
 import dataconf
@@ -66,11 +66,4 @@ class Destination(ConfigurationBase):
 
 @dataclass
 class Configuration(ConfigurationBase):
-    account: Account
-    settings: Settings
-    destination: Destination
-
-
-@dataclass
-class SyncActionConfiguration(ConfigurationBase):
     account: Account
