@@ -37,9 +37,6 @@ class Component(ComponentBase):
 
     def run(self):
 
-        self.list_sharepoint_libraries()
-        exit()
-
         self._init_configuration()
         statefile = self.get_state_file()
 
