@@ -101,7 +101,8 @@ class Component(ComponentBase):
             self._configuration: Configuration = Configuration.load_from_dict(self.configuration.parameters)
         else:
             self.validate_configuration_parameters(SyncActionConfiguration.get_dataclass_required_parameters())
-            self._configuration: Configuration = SyncActionConfiguration.load_from_dict(self.configuration.parameters)
+            self._configuration: SyncActionConfiguration = (
+                SyncActionConfiguration.load_from_dict(self.configuration.parameters))
 
     def _get_client(self, account_params: Account) -> OneDriveClient:
         tenant_id = account_params.tenant_id
