@@ -36,10 +36,6 @@ class Component(ComponentBase):
         self.client_secret = self.configuration.oauth_credentials.appSecret
 
     def run(self):
-
-        self.list_sharepoint_libraries()
-        exit()
-
         self._init_configuration()
         statefile = self.get_state_file()
 
