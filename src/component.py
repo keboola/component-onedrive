@@ -112,8 +112,10 @@ class Component(ComponentBase):
 
     @sync_action("listLibraries")
     def list_sharepoint_libraries(self) -> List[SelectElement]:
+        account_json = self.configuration.parameters.get("account", {})
         self.validate_configuration_parameters(Account.get_dataclass_required_parameters())
-        acc_config = Account.load_from_dict(self.configuration.parameters.get("account"))
+
+        acc_config = Account.load_from_dict(account_json)
 
         client = self._get_client(acc_config)
         libraries = client.get_document_libraries(acc_config.site_url)
