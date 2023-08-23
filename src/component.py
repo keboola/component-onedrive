@@ -37,6 +37,9 @@ class Component(ComponentBase):
 
     def run(self):
 
+        self.list_sharepoint_libraries()
+        exit()
+
         self._init_configuration()
         statefile = self.get_state_file()
 
@@ -113,7 +116,8 @@ class Component(ComponentBase):
     @sync_action("listLibraries")
     def list_sharepoint_libraries(self) -> List[SelectElement]:
         account_json = self.configuration.parameters.get("account", {})
-        self.validate_configuration_parameters(Account.get_dataclass_required_parameters())
+        required_parameters = ["tenant_id", "site_url"]
+        self._validate_parameters(account_json, required_parameters, 'Credentials')
 
         acc_config = Account.load_from_dict(account_json)
 
