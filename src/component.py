@@ -7,7 +7,7 @@ from keboola.component.exceptions import UserException
 from keboola.component.sync_actions import SelectElement
 
 from client.client import OneDriveClient, OneDriveClientException
-from configuration import Configuration, SyncActionConfiguration, Account
+from configuration import Configuration, Account
 
 # Configuration variables
 KEY_GROUP_ACCOUNT = 'account'
@@ -94,15 +94,9 @@ class Component(ComponentBase):
                                 "set last_modified in statefile manually.")
         return last_modified_at
 
-    def _init_configuration(self, init_sync_action: bool = False) -> None:
-        """Sync Action does not require settings and destination objects."""
-        if not init_sync_action:
-            self.validate_configuration_parameters(Configuration.get_dataclass_required_parameters())
-            self._configuration: Configuration = Configuration.load_from_dict(self.configuration.parameters)
-        else:
-            self.validate_configuration_parameters(SyncActionConfiguration.get_dataclass_required_parameters())
-            self._configuration: SyncActionConfiguration = (
-                SyncActionConfiguration.load_from_dict(self.configuration.parameters))
+    def _init_configuration(self) -> None:
+        self.validate_configuration_parameters(Configuration.get_dataclass_required_parameters())
+        self._configuration: Configuration = Configuration.load_from_dict(self.configuration.parameters)
 
     def _get_client(self, account_params: Account) -> OneDriveClient:
         tenant_id = account_params.tenant_id
@@ -118,9 +112,11 @@ class Component(ComponentBase):
 
     @sync_action("listLibraries")
     def list_sharepoint_libraries(self) -> List[SelectElement]:
-        self._init_configuration(init_sync_action=True)
-        client = self._get_client(self._configuration.account)
-        libraries = client.get_document_libraries(self._configuration.account.site_url)
+        self.validate_configuration_parameters(Account.get_dataclass_required_parameters())
+        acc_config = Account.load_from_dict(self.configuration.parameters.get("account"))
+
+        client = self._get_client(acc_config)
+        libraries = client.get_document_libraries(acc_config.site_url)
 
         return [
             SelectElement(
