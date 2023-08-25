@@ -69,8 +69,3 @@ class Configuration(ConfigurationBase):
     account: Account
     settings: Settings
     destination: Destination
-
-
-@dataclass
-class SyncActionConfiguration(ConfigurationBase):
-    account: Account
