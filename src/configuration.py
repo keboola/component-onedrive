@@ -61,7 +61,7 @@ class Settings(ConfigurationBase):
 @dataclass
 class Destination(ConfigurationBase):
     custom_tag: str = ""
-    permanent_files: bool = False
+    permanent: bool = False
 
 
 @dataclass

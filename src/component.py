@@ -72,7 +72,7 @@ class Component(ComponentBase):
         tag = self._configuration.destination.custom_tag
         tags = [tag] if tag else []
 
-        permanent = self._configuration.destination.permanent_files
+        permanent = self._configuration.destination.permanent
         if permanent:
             logging.info("Downloaded files will be stored as permanent files.")
 
