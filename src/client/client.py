@@ -1,5 +1,4 @@
 import requests
-import shutil
 import logging
 import fnmatch
 import os
