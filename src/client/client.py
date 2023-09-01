@@ -1,4 +1,5 @@
 import requests
+import shutil
 import logging
 import fnmatch
 import os
@@ -290,26 +291,24 @@ class OneDriveClient(HttpClient):
         """
         Downloads a file from OneDrive using the provided download URL and saves it to the specified output path.
         """
-        response = self.get_request(url, is_absolute_path=True, stream=True)
+        with self.get_request(url, is_absolute_path=True, stream=True) as r:
 
-        if response is None:
-            self._handle_no_response(filename)
-            return
-
-        if response.status_code != 200:
-            self._handle_invalid_status_code(response.status_code, filename)
-            return
-
-        try:
-            parsed_response = self._parse_response(response, url, filename)
-            if parsed_response is None:
-                self._handle_no_content(filename)
+            if r is None:
+                self._handle_no_response(filename)
                 return
 
-            self._write_content_to_file(response, output_path)
-            logging.info(f"File {filename} downloaded.")
-        except OneDriveClientException as e:
-            raise e
+            if r.status_code != 200:
+                self._handle_invalid_status_code(r.status_code, filename)
+                return
+
+            try:
+                with open(output_path, 'wb') as f:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        f.write(chunk)
+
+                logging.info(f"File {filename} downloaded.")
+            except OneDriveClientException as e:
+                raise e
 
         self._handle_existing_file(filename)
 
@@ -321,20 +320,10 @@ class OneDriveClient(HttpClient):
     def _handle_invalid_status_code(status_code, filename):
         logging.error(f"Cannot download file {filename}, received {status_code} from OneDrive API.")
 
-    @staticmethod
-    def _handle_no_content(filename):
-        logging.warning(f"No content in the response for file {filename}.")
-
-    @staticmethod
-    def _write_content_to_file(response, output_path):
-        with open(output_path, "wb") as f:
-            for chunk in response.iter_content(chunk_size=32768):
-                f.write(chunk)
-
     def _handle_existing_file(self, filename):
         if filename in self.downloaded_files:
-            logging.warning(f"File {filename} has the same as an already downloaded file. "
-                            f"It will be overwritten.")
+            logging.warning(f"File {filename} has the same filename as an already downloaded file. "
+                            f"It has been overwritten.")
         self.downloaded_files.append(filename)
 
     def _get_items_based_on_client_type(self, folder_path, library_name):
