@@ -37,7 +37,7 @@
         },
         "permanent": {
           "type": "boolean",
-          "title": "Permanent Files (optional)",
+          "title": "Permanent Files",
           "default": false,
           "format": "checkbox",
           "description": "If set to true, downloaded files will be stored as permanent in Keboola storage. Otherwise, they will be deleted after 14 days.",
