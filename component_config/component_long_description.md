@@ -1,1 +1,1 @@
-Downloads data from personal Onedrive, OneDrive for Business and Sharepoint. Also supports SharePoint's document libraries.
+Downloads files from personal Onedrive, OneDrive for Business and Sharepoint. Also supports SharePoint's document libraries.
