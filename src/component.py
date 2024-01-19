@@ -9,21 +9,6 @@ from keboola.component.sync_actions import SelectElement
 from client.client import OneDriveClient, OneDriveClientException
 from configuration import Configuration, Account
 
-# Configuration variables
-KEY_GROUP_ACCOUNT = 'account'
-KEY_GROUP_SETTINGS = 'settings'
-KEY_GROUP_DESTINATION = 'destination'
-KEY_TENANT_ID = 'tenant_id'
-KEY_SITE_URL = 'site_url'
-KEY_FILE_PATH = 'file_path'
-KEY_CUSTOM_TAG = 'custom_tag'
-NEW_FILES_ONLY = 'new_files_only'
-KEY_LIBRARY_NAME = 'library_name'
-KEY_PERMANENT = 'permanent'
-
-# List of required parameters
-REQUIRED_PARAMETERS = []
-
 
 class Component(ComponentBase):
 
@@ -40,6 +25,7 @@ class Component(ComponentBase):
         statefile = self.get_state_file()
 
         file_path = self._configuration.settings.file_path
+
         if not file_path:
             file_path = "*"
             logging.warning("File path is not set, the component will try to download everything "

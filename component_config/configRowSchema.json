@@ -9,7 +9,7 @@
       "properties": {
         "file_path": {
           "type": "string",
-          "title": "File path",
+          "title": "File Path",
           "default": "*",
           "propertyOrder": 1,
           "description": "Source file path with its extension or wildcard."
