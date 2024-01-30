@@ -1,1 +1,1 @@
-OneDrive Files Extractor
+Microsoft's OneDrive and SharePoint cloud storage allows individuals to store and access files across devices, while the business version offers enhanced collaboration features. 
