@@ -1,1 +1,2 @@
-Microsoft's OneDrive and SharePoint cloud storage allows individuals to store and access files across devices, while the business version offers enhanced collaboration features. 
+Microsoft OneDrive is a file hosting service used for saving files in the cloud, sharing them, and even collaborating on content.
+
