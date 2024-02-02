@@ -1,6 +1,6 @@
 {
   "type": "object",
-  "title": "Data Source configuration",
+  "title": "Data source configuration",
   "properties": {
     "settings": {
       "type": "object",
@@ -9,17 +9,17 @@
       "properties": {
         "file_path": {
           "type": "string",
-          "title": "File Path",
+          "title": "File path",
           "default": "*",
           "propertyOrder": 1,
-          "description": "Source file path with its extension or wildcard."
+          "description": "Source file path with its extension or wildcard"
         },
         "new_files_only": {
           "type": "boolean",
           "format": "checkbox",
-          "title": "New Files Only",
+          "title": "New files only",
           "default": false,
-          "description": "Every job stores the timestamp of the last downloaded file and a subsequent job can pick up from there.",
+          "description": "Every job stores the timestamp of the last downloaded file, and a subsequent job can pick up from there.",
           "propertyOrder": 2
         }
       }
@@ -31,16 +31,16 @@
       "properties": {
         "custom_tag": {
           "type": "string",
-          "title": "Custom Tag (optional)",
-          "description": "Adds custom tag to Keboola Storage for all downloaded files.",
+          "title": "Custom tag (optional)",
+          "description": "Adds a custom tag to Keboola Storage for all downloaded files.",
           "propertyOrder": 1
         },
         "permanent": {
           "type": "boolean",
-          "title": "Permanent Files",
+          "title": "Permanent files",
           "default": false,
           "format": "checkbox",
-          "description": "If set to true, downloaded files will be stored as permanent in Keboola storage. Otherwise, they will be deleted after 14 days.",
+          "description": "If set to true, downloaded files will be stored in Keboola Storage permanently. Otherwise, they will be deleted after 14 days.",
           "propertyOrder": 2
         }
       }
