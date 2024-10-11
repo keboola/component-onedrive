@@ -109,6 +109,8 @@ class Component(ComponentBase):
     def _get_refresh_tokens(self) -> list[str]:
         state_file = self.get_state_file()
         state_refresh_token = state_file.get(self.configuration.oauth_credentials.id, {}).get(KEY_STATE_REFRESH_TOKEN)
+        if state_refresh_token:
+            logging.info(f"State refresh token found")
         return [token for token in [state_refresh_token, self.refresh_token] if token]
 
     def _save_refresh_token_state(self, new_refresh_token):
