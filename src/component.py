@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import List, Union, Any
+from typing import List, Union, Any, Iterable
 
 from keboola.component.base import ComponentBase, sync_action
 from keboola.component.exceptions import UserException
@@ -8,6 +8,10 @@ from keboola.component.sync_actions import SelectElement
 
 from client.client import OneDriveClient, OneDriveClientException
 from configuration import Configuration, Account
+from src.client.exceptions import BadRequest
+
+KEY_STATE_AUTH_ID = "auth_id"
+KEY_STATE_REFRESH_TOKEN = "#refresh_token"
 
 
 class Component(ComponentBase):
@@ -22,7 +26,7 @@ class Component(ComponentBase):
 
     def run(self):
         self._init_configuration()
-        statefile = self.get_state_file()
+        state_file = self.get_state_file()
 
         file_path = self._configuration.settings.file_path
 
@@ -33,9 +37,10 @@ class Component(ComponentBase):
 
         library_name = self._configuration.account.library_name
 
-        last_modified_at = self._set_last_modified(statefile)
+        last_modified_at = self._set_last_modified(state_file)
 
         client = self._get_client(self._configuration.account)
+
         try:
             client.download_files(file_path=file_path, output_dir=self.files_out_path,
                                   last_modified_at=last_modified_at, library_name=library_name)
@@ -66,12 +71,12 @@ class Component(ComponentBase):
             file_def = self.create_out_file_definition(filename, tags=tags, is_permanent=permanent)
             self.write_manifest(file_def)
 
-    def _set_last_modified(self, statefile) -> Union[str, Any]:
+    def _set_last_modified(self, state_file) -> Union[str, Any]:
         get_new_only = self._configuration.settings.new_files_only
         last_modified_at = False
         if get_new_only:
-            if statefile.get("last_modified", False):
-                last_modified_at = datetime.fromisoformat(statefile.get("last_modified"))
+            if state_file.get("last_modified", False):
+                last_modified_at = datetime.fromisoformat(state_file.get("last_modified"))
                 logging.info(f"Component will download files with lastModifiedDateTime > {last_modified_at}")
             else:
                 logging.warning("last_modified timestamp not found in statefile, Cannot download new files only. "
@@ -86,14 +91,28 @@ class Component(ComponentBase):
     def _get_client(self, account_params: Account) -> OneDriveClient:
         tenant_id = account_params.tenant_id
         site_url = account_params.site_url
-        try:
-            client = OneDriveClient(refresh_token=self.refresh_token, files_out_folder=self.files_out_path,
-                                    client_id=self.client_id, client_secret=self.client_secret,
-                                    tenant_id=tenant_id, site_url=site_url)
-        except OneDriveClientException as e:
-            raise UserException(e) from e
+        for refresh_token in self._get_refresh_tokens():
+            try:
+                client = OneDriveClient(refresh_token=refresh_token, files_out_folder=self.files_out_path,
+                                        client_id=self.client_id, client_secret=self.client_secret,
+                                        tenant_id=tenant_id, site_url=site_url)
+                self._save_refresh_token_state(client.refresh_token)
+                return client
+            except BadRequest as e:
+                logging.exception(f"Refresh token failed, retrying connection with new refresh token. {e}")
+                pass
+            except OneDriveClientException as e:
+                raise UserException(e) from e
+        raise UserException('Authentication failed, reauthorize the extractor in extractor configuration!')
 
-        return client
+    def _get_refresh_tokens(self) -> list[str]:
+        state_file = self.get_state_file()
+        state_refresh_token = state_file.get(self.configuration.oauth_credentials.id).get(KEY_STATE_REFRESH_TOKEN)
+        return [token for token in [self.refresh_token, state_refresh_token] if token]
+
+    def _save_refresh_token_state(self, new_refresh_token):
+        self.write_state_file(
+            {self.configuration.oauth_credentials.id: {KEY_STATE_REFRESH_TOKEN: new_refresh_token}})
 
     @sync_action("listLibraries")
     def list_sharepoint_libraries(self) -> List[SelectElement]:
@@ -104,6 +123,7 @@ class Component(ComponentBase):
         acc_config = Account.load_from_dict(account_json)
 
         client = self._get_client(acc_config)
+
         libraries = client.get_document_libraries(acc_config.site_url)
 
         return [
