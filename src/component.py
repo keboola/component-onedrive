@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import List, Union, Any, Iterable
+from typing import List, Union, Any
 
 from keboola.component.base import ComponentBase, sync_action
 from keboola.component.exceptions import UserException
