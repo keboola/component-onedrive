@@ -126,7 +126,8 @@ class OneDriveClient(HttpClient):
                                           "reauthorize the extractor in extractor configuration.")
         logging.info("New Access token fetched.")
         self.access_token = response.json()["access_token"]
-        self._refresh_token = response.json()['refresh_token']
+        logging.debug(response.json())
+        self._refresh_token = response.json()["refresh_token"]
 
         new_header = {"Authorization": 'Bearer ' + self.access_token, "Content-Type": "application/json"}
         self.update_auth_header(updated_header=new_header, overwrite=True)
