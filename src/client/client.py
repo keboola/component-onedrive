@@ -79,7 +79,8 @@ class OneDriveClient(HttpClient):
         client_type = "OneDrive"
         authority = 'https://login.microsoftonline.com/common'
         self.base_url = 'https://graph.microsoft.com/v1.0/me'
-        scope = ['https://graph.microsoft.com/User.Read', 'https://graph.microsoft.com/Files.Read.All']
+        scope = ['https://graph.microsoft.com/User.Read', 'https://graph.microsoft.com/Files.Read.All',
+                 'https://graph.microsoft.com/wl.offline_access']
         return client_type, authority, scope
 
     def _configure_sharepoint_client(self):
