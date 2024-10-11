@@ -10,7 +10,6 @@ from client.client import OneDriveClient, OneDriveClientException
 from configuration import Configuration, Account
 from src.client.exceptions import BadRequest
 
-KEY_STATE_AUTH_ID = "auth_id"
 KEY_STATE_REFRESH_TOKEN = "#refresh_token"
 
 
