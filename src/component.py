@@ -52,7 +52,7 @@ class Component(ComponentBase):
     def _save_timestamp(self, client, file_path) -> None:
         if client.freshest_file_timestamp:
             freshest_timestamp = client.freshest_file_timestamp.isoformat()
-            self.write_state_file({"last_modified": freshest_timestamp})
+            self._save_to_state({"last_modified": freshest_timestamp})
             logging.info(f"Saving freshest file timestamp to statefile: {freshest_timestamp}")
         else:
             logging.warning(f"The component has not found any files matching filename: {file_path}")
@@ -110,8 +110,13 @@ class Component(ComponentBase):
         return [token for token in [self.refresh_token, state_refresh_token] if token]
 
     def _save_refresh_token_state(self, new_refresh_token):
-        self.write_state_file(
+        self._save_to_state(
             {self.configuration.oauth_credentials.id: {KEY_STATE_REFRESH_TOKEN: new_refresh_token}})
+
+    def _save_to_state(self, data: dict) -> None:
+        actual_data = self.get_state_file()
+        new_data = {**actual_data, **data}
+        self.write_state_file(new_data)
 
     @sync_action("listLibraries")
     def list_sharepoint_libraries(self) -> List[SelectElement]:
