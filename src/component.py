@@ -116,10 +116,12 @@ class Component(ComponentBase):
             {self.configuration.oauth_credentials.id: {KEY_STATE_REFRESH_TOKEN: new_refresh_token}})
 
     def _save_to_state(self, data: dict) -> None:
-        with open(os.path.join(self.configuration.data_dir, 'out', 'state.json'), 'rw+') as state_file:
+        with open(os.path.join(self.configuration.data_dir, 'out', 'state.json'), 'r+') as state_file:
             actual_data = json.load(state_file)
+            state_file.seek(0)  # Move the cursor to the beginning of the file
             new_data = {**actual_data, **data}
             json.dump(new_data, state_file)
+            state_file.truncate()  # Remove remaining part if the new data is shorter
 
     @sync_action("listLibraries")
     def list_sharepoint_libraries(self) -> List[SelectElement]:
