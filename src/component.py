@@ -94,6 +94,7 @@ class Component(ComponentBase):
         site_url = account_params.site_url
         for refresh_token in self._get_refresh_tokens():
             try:
+                logging.debug(f"Trying to connect with refresh token: {str(refresh_token).substr(0, 10)}")
                 client = OneDriveClient(refresh_token=refresh_token, files_out_folder=self.files_out_path,
                                         client_id=self.client_id, client_secret=self.client_secret,
                                         tenant_id=tenant_id, site_url=site_url)
