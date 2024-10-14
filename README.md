@@ -16,6 +16,11 @@ Prerequisites
 
 OAuth authorization is required for personal OneDrive, while for OneDrive for business, you need to know the Tenant ID in addition to OAuth. If you want to use Sharepoint, you also need to provide the site name.
 
+#### Refresh Token
+
+The refresh token is used to obtain a new access token. The refresh token is stored in the state file and is used for runs of the writer ROW! A problem with no valid refresh token can appear if new rows are added after the main OAuth refresh token expiration time.
+
+
 Supported Features
 ===================
 
