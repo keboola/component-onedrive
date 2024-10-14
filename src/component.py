@@ -10,7 +10,6 @@ from keboola.component.sync_actions import SelectElement
 
 from client.client import OneDriveClient, OneDriveClientException
 from configuration import Configuration, Account
-from client.exceptions import BadRequest
 
 KEY_STATE_REFRESH_TOKEN = "#refresh_token"
 
