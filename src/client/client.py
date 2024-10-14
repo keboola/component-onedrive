@@ -43,6 +43,10 @@ class OneDriveClient(HttpClient):
     def __init__(self, refresh_token, files_out_folder, client_id, client_secret, tenant_id=None, site_url=None):
 
         self.base_url = ""
+
+        super().__init__(base_url=self.base_url, max_retries=self.MAX_RETRIES, backoff_factor=0.3,
+                         status_forcelist=(429, 503, 500, 502, 504))
+
         self.files_out_folder = files_out_folder
         self._refresh_token = refresh_token
 
@@ -60,9 +64,6 @@ class OneDriveClient(HttpClient):
         self.downloaded_files = []
         self.freshest_file_timestamp = None
         self.file_mask = None
-
-        super().__init__(base_url=self.base_url, max_retries=self.MAX_RETRIES, backoff_factor=0.3,
-                         status_forcelist=(429, 503, 500, 502, 504))
 
     def _configure_client(self):
         if not self.tenant_id and not self.site_url:
@@ -125,7 +126,8 @@ class OneDriveClient(HttpClient):
             raise OneDriveClientException("Authentication failed, "
                                           "reauthorize the extractor in extractor configuration.")
         logging.info("New Access token fetched.")
-        self.access_token = response.json()["access_token"]
+        self.access_token = token
+
         self._refresh_token = response.json()["refresh_token"]
 
         new_header = {"Authorization": 'Bearer ' + self.access_token, "Content-Type": "application/json"}
@@ -136,8 +138,6 @@ class OneDriveClient(HttpClient):
         return self._refresh_token
 
     def get_request(self, url: str, is_absolute_path: bool, stream: bool = False):
-        logging.debug(f"refresh token: {self._refresh_token[0:10]},"
-                      f" access token: {self.access_token[0:10]}")
         response = self.get_raw(url, is_absolute_path=is_absolute_path, stream=stream)
         if response.status_code == 200:
             return response

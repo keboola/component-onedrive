@@ -94,17 +94,14 @@ class Component(ComponentBase):
         site_url = account_params.site_url
         for refresh_token in self._get_refresh_tokens():
             try:
-                logging.debug(f"Trying to connect with refresh token: {refresh_token[0:10]}")
                 client = OneDriveClient(refresh_token=refresh_token, files_out_folder=self.files_out_path,
                                         client_id=self.client_id, client_secret=self.client_secret,
                                         tenant_id=tenant_id, site_url=site_url)
                 self._save_refresh_token_state(client.refresh_token)
                 return client
-            except BadRequest as e:
-                logging.exception(f"Refresh token failed, retrying connection with new refresh token. {e}")
+            except OneDriveClientException:
+                logging.warning("Refresh token failed, retrying connection with new refresh token.")
                 pass
-            except OneDriveClientException as e:
-                raise UserException(e) from e
         raise UserException('Authentication failed, reauthorize the extractor in extractor configuration!')
 
     def _get_refresh_tokens(self) -> list[str]:
