@@ -43,8 +43,12 @@ class OneDriveClient(HttpClient):
     def __init__(self, refresh_token, files_out_folder, client_id, client_secret, tenant_id=None, site_url=None):
 
         self.base_url = ""
+
+        super().__init__(base_url=self.base_url, max_retries=self.MAX_RETRIES, backoff_factor=0.3,
+                         status_forcelist=(429, 503, 500, 502, 504))
+
         self.files_out_folder = files_out_folder
-        self.refresh_token = refresh_token
+        self._refresh_token = refresh_token
 
         self.client_id = client_id
         self.client_secret = client_secret
@@ -55,14 +59,11 @@ class OneDriveClient(HttpClient):
         self.client_type, self.authority, self.scope = self._configure_client()
 
         if not self.access_token:
-            self._get_access_token()
+            self._get_request_tokens()
 
         self.downloaded_files = []
         self.freshest_file_timestamp = None
         self.file_mask = None
-
-        super().__init__(base_url=self.base_url, max_retries=self.MAX_RETRIES, backoff_factor=0.3,
-                         status_forcelist=(429, 503, 500, 502, 504))
 
     def _configure_client(self):
         if not self.tenant_id and not self.site_url:
@@ -79,30 +80,30 @@ class OneDriveClient(HttpClient):
         client_type = "OneDrive"
         authority = 'https://login.microsoftonline.com/common'
         self.base_url = 'https://graph.microsoft.com/v1.0/me'
-        scope = ['https://graph.microsoft.com/User.Read', 'https://graph.microsoft.com/Files.Read.All']
+        scope = 'User.Read Files.Read.All offline_access'
         return client_type, authority, scope
 
     def _configure_sharepoint_client(self):
         logging.info("Initializing Sharepoint client")
         client_type = "Sharepoint"
         authority = f'https://login.microsoftonline.com/{self.tenant_id}'
-        self.scope = 'https://graph.microsoft.com/Sites.Read.All https://graph.microsoft.com/Files.Read.All'
+        scope = 'Sites.Read.All Files.Read.All offline_access'
         # We need access token to get site id and url
         self.base_url = 'https://graph.microsoft.com/v1.0/sites/'
-        self._get_access_token()
+        self._get_request_tokens()
         site_id = self.get_site_id_from_url(self.site_url)
         self.base_url = self.base_url + site_id
-        return client_type, authority, self.scope
+        return client_type, authority, scope
 
     def _configure_onedrive_for_business_client(self):
         logging.info("Initializing OneDriveForBusiness client")
         client_type = "OneDriveForBusiness"
         authority = f'https://login.microsoftonline.com/{self.tenant_id}'
         self.base_url = 'https://graph.microsoft.com/v1.0/me/drive'
-        scope = 'https://graph.microsoft.com/Sites.Read.All https://graph.microsoft.com/Files.Read.All'
+        scope = 'Sites.Read.All Files.Read.All offline_access'
         return client_type, authority, scope
 
-    def _get_access_token(self) -> None:
+    def _get_request_tokens(self) -> None:
         """
         This is handled using requests to handle compatibility with OneDrive and Sharepoint client.
         """
@@ -114,7 +115,7 @@ class OneDriveClient(HttpClient):
             "client_secret": self.client_secret,
             "scope": self.scope,
             "grant_type": "refresh_token",
-            "refresh_token": self.refresh_token,
+            "refresh_token": self._refresh_token,
         }
 
         response = requests.post(url=request_url, headers=headers, data=payload)
@@ -125,17 +126,23 @@ class OneDriveClient(HttpClient):
             raise OneDriveClientException("Authentication failed, "
                                           "reauthorize the extractor in extractor configuration.")
         logging.info("New Access token fetched.")
-        self.access_token = response.json()["access_token"]
+        self.access_token = token
+
+        self._refresh_token = response.json()["refresh_token"]
 
         new_header = {"Authorization": 'Bearer ' + self.access_token, "Content-Type": "application/json"}
         self.update_auth_header(updated_header=new_header, overwrite=True)
+
+    @property
+    def refresh_token(self):
+        return self._refresh_token
 
     def get_request(self, url: str, is_absolute_path: bool, stream: bool = False):
         response = self.get_raw(url, is_absolute_path=is_absolute_path, stream=stream)
         if response.status_code == 200:
             return response
         elif response.status_code == 401:
-            self._get_access_token()
+            self._get_request_tokens()
             return self.get_request(url, is_absolute_path, stream)
         elif response.status_code == 404:
             logging.error(f"Url {url} returned 404.")
