@@ -43,6 +43,7 @@ class OneDriveClient(HttpClient):
     def __init__(self, refresh_token, files_out_folder, client_id, client_secret, tenant_id=None, site_url=None):
 
         self.base_url = ""
+        self.access_token = ""
 
         super().__init__(base_url=self.base_url, max_retries=self.MAX_RETRIES, backoff_factor=0.3,
                          status_forcelist=(429, 503, 500, 502, 504))
@@ -54,12 +55,7 @@ class OneDriveClient(HttpClient):
         self.client_secret = client_secret
         self.tenant_id = tenant_id
         self.site_url = site_url
-        self.access_token = ""
-
-        self.client_type, self.authority, self.scope = self._configure_client()
-
-        if not self.access_token:
-            self._get_request_tokens()
+        self._configure_client()
 
         self.downloaded_files = []
         self.freshest_file_timestamp = None
@@ -77,31 +73,30 @@ class OneDriveClient(HttpClient):
 
     def _configure_onedrive_client(self):
         logging.info("Initializing OneDrive client")
-        client_type = "OneDrive"
-        authority = 'https://login.microsoftonline.com/common'
+        self.client_type = "OneDrive"
+        self.authority = 'https://login.microsoftonline.com/common'
         self.base_url = 'https://graph.microsoft.com/v1.0/me'
-        scope = 'User.Read Files.Read.All offline_access'
-        return client_type, authority, scope
+        self.scope = 'User.Read Files.Read.All offline_access'
+        self._get_request_tokens()
 
     def _configure_sharepoint_client(self):
         logging.info("Initializing Sharepoint client")
-        client_type = "Sharepoint"
-        authority = f'https://login.microsoftonline.com/{self.tenant_id}'
+        self.client_type = "Sharepoint"
+        self.authority = f'https://login.microsoftonline.com/{self.tenant_id}'
         self.scope = 'Sites.Read.All Files.Read.All offline_access'
-        # We need access token to get site id and url
         self.base_url = 'https://graph.microsoft.com/v1.0/sites/'
+        # We need access token to get site id and url
         self._get_request_tokens()
         site_id = self.get_site_id_from_url(self.site_url)
         self.base_url = self.base_url + site_id
-        return client_type, authority, self.scope
 
     def _configure_onedrive_for_business_client(self):
         logging.info("Initializing OneDriveForBusiness client")
-        client_type = "OneDriveForBusiness"
-        authority = f'https://login.microsoftonline.com/{self.tenant_id}'
+        self.client_type = "OneDriveForBusiness"
+        self.authority = f'https://login.microsoftonline.com/{self.tenant_id}'
         self.base_url = 'https://graph.microsoft.com/v1.0/me/drive'
-        scope = 'Sites.Read.All Files.Read.All offline_access'
-        return client_type, authority, scope
+        self.scope = 'Sites.Read.All Files.Read.All offline_access'
+        self._get_request_tokens()
 
     def _get_request_tokens(self) -> None:
         """
@@ -125,9 +120,9 @@ class OneDriveClient(HttpClient):
             logging.error(response.json())
             raise OneDriveClientException("Authentication failed, "
                                           "reauthorize the extractor in extractor configuration.")
+
         logging.info("New Access token fetched.")
         self.access_token = token
-
         self._refresh_token = response.json()["refresh_token"]
 
         new_header = {"Authorization": 'Bearer ' + self.access_token, "Content-Type": "application/json"}
