@@ -87,13 +87,13 @@ class OneDriveClient(HttpClient):
         logging.info("Initializing Sharepoint client")
         client_type = "Sharepoint"
         authority = f'https://login.microsoftonline.com/{self.tenant_id}'
-        scope = 'Sites.Read.All Files.Read.All offline_access'
+        self.scope = 'Sites.Read.All Files.Read.All offline_access'
         # We need access token to get site id and url
         self.base_url = 'https://graph.microsoft.com/v1.0/sites/'
         self._get_request_tokens()
         site_id = self.get_site_id_from_url(self.site_url)
         self.base_url = self.base_url + site_id
-        return client_type, authority, scope
+        return client_type, authority, self.scope
 
     def _configure_onedrive_for_business_client(self):
         logging.info("Initializing OneDriveForBusiness client")
