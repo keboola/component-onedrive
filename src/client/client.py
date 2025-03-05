@@ -237,6 +237,8 @@ class OneDriveClient(HttpClient):
         libraries = self._get_sharepoint_document_libraries()
         library = next((lib for lib in libraries if lib['name'] == library_name), None)
         if library is None:
+            library = next((lib for lib in libraries if lib['webUrl'].split("/")[-1] == library_name), None)
+        if library is None:
             raise OneDriveClientException(f"Library '{library_name}' not found")
         return library['id']
 
