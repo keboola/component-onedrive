@@ -235,6 +235,7 @@ class OneDriveClient(HttpClient):
 
     def _get_sharepoint_library_id(self, library_name):
         libraries = self._get_sharepoint_document_libraries()
+        logging.debug(f"Found libraries: {libraries}")
         library = next((lib for lib in libraries if lib['name'] == library_name), None)
         if library is None:
             library = next((lib for lib in libraries if lib['webUrl'].split("/")[-1] == library_name), None)
