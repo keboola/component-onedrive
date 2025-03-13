@@ -184,7 +184,9 @@ class OneDriveClient(HttpClient):
         if library_name:
             logging.info(f"The component will try to fetch files from library {library_name}")
             library_id = self._get_sharepoint_library_id(library_name)
+            logging.info(f"Library id: {library_id}")
             library_drive_id = self._get_sharepoint_library_drive_id(library_id)
+            logging.info(f"Library drive id: {library_drive_id}")
             if not folder_id:
                 folder_id = self._get_sharepoint_folder_id_from_path(library_drive_id, folder_path)
             folder_path = self._make_library_folder_path(folder_id, library_drive_id)
