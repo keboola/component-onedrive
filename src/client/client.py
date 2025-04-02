@@ -250,7 +250,10 @@ class OneDriveClient(HttpClient):
         response = self.get_request(url, is_absolute_path=True)
 
         if response and response.status_code == 200:
-            return response.json()['id']
+            try:
+                return response.json()['id']
+            except KeyError:
+                raise OneDriveClientException(f"Error fetching library drive: {response.json()}")
 
         error_message = f"Error fetching library drive: {response.status_code}, {response.text}" \
             if response else "Error fetching library drive: No response received"
@@ -297,7 +300,7 @@ class OneDriveClient(HttpClient):
         """
         Downloads a file from OneDrive using the provided download URL and saves it to the specified output path.
         """
-        with self.get_request(url, is_absolute_path=True, stream=True) as r:
+        with self.get_request(new_url, is_absolute_path=True, stream=True) as r:
 
             if r is None:
                 self._handle_no_response(filename)
