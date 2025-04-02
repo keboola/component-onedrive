@@ -300,7 +300,7 @@ class OneDriveClient(HttpClient):
         """
         Downloads a file from OneDrive using the provided download URL and saves it to the specified output path.
         """
-        with self.get_request(new_url, is_absolute_path=True, stream=True) as r:
+        with self.get_request(url, is_absolute_path=True, stream=True) as r:
 
             if r is None:
                 self._handle_no_response(filename)
