@@ -1,7 +1,6 @@
 keboola.component==1.4.4
-keboola.http-client
+keboola.http-client==1.0.0
 mock~=5.0.1
 freezegun~=1.2.2
-keboola.http-client
 backoff==2.2.1
 dataconf==2.2.1

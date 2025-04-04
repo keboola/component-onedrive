@@ -184,7 +184,9 @@ class OneDriveClient(HttpClient):
         if library_name:
             logging.info(f"The component will try to fetch files from library {library_name}")
             library_id = self._get_sharepoint_library_id(library_name)
+            logging.info(f"Library id: {library_id}")
             library_drive_id = self._get_sharepoint_library_drive_id(library_id)
+            logging.info(f"Library drive id: {library_drive_id}")
             if not folder_id:
                 folder_id = self._get_sharepoint_folder_id_from_path(library_drive_id, folder_path)
             folder_path = self._make_library_folder_path(folder_id, library_drive_id)
@@ -235,6 +237,7 @@ class OneDriveClient(HttpClient):
 
     def _get_sharepoint_library_id(self, library_name):
         libraries = self._get_sharepoint_document_libraries()
+        logging.debug(f"Found libraries: {libraries}")
         library = next((lib for lib in libraries if lib['name'] == library_name), None)
         if library is None:
             library = next((lib for lib in libraries if lib['webUrl'].split("/")[-1] == library_name), None)
@@ -247,7 +250,10 @@ class OneDriveClient(HttpClient):
         response = self.get_request(url, is_absolute_path=True)
 
         if response and response.status_code == 200:
-            return response.json()['id']
+            try:
+                return response.json()['id']
+            except KeyError:
+                raise OneDriveClientException(f"Error fetching library drive: {response.json()}")
 
         error_message = f"Error fetching library drive: {response.status_code}, {response.text}" \
             if response else "Error fetching library drive: No response received"
