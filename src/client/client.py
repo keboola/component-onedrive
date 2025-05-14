@@ -360,9 +360,17 @@ class OneDriveClient(HttpClient):
                 self._process_file_item(item, mask, output_dir, last_modified_at)
 
     def _process_folder_item(self, item, folder_mask, mask, folder_path, output_dir, last_modified_at, library_name):
+        full_pattern = os.path.join(folder_path, mask)
+        current_path = os.path.join(folder_path, item['name'])
+        
+        if not fnmatch.fnmatch(current_path, full_pattern):
+            logging.debug(f"Skipping folder {item['name']} because it doesn't match the pattern {full_pattern}")
+            return
+
         if folder_mask and not fnmatch.fnmatch(item['name'], folder_mask):
             logging.debug(f"Skipping folder {item['name']} because it doesn't match the folder_mask {folder_mask}")
             return
+
         subfolder_file_path = os.path.join(folder_path, item['name'], os.path.basename(mask))
         self.download_files(subfolder_file_path, output_dir, last_modified_at, library_name)
 
