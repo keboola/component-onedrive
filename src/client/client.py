@@ -151,18 +151,29 @@ class OneDriveClient(HttpClient):
         if folder_path is None or folder_path == '/':
             return 'root'
 
+        path_parts = folder_path.strip('/').split('/')
+        # Find the first part that doesn't contain a wildcard
+        valid_path_parts = []
+        for part in path_parts:
+            if '*' in part or '?' in part:
+                break
+            valid_path_parts.append(part)
+
+        # Use only the valid path parts for the API request
+        valid_path = '/'.join(valid_path_parts)
+
         drive_root = f"{self.base_url}/{'root' if drive_type == 'ofb' else 'drive/root'}"
-        url = f"{drive_root}:/{folder_path.strip('/')}:/"
+        url = f"{drive_root}:/{valid_path}:/" if valid_path else f"{drive_root}:"
         response = self.get_request(url, is_absolute_path=True)
 
         if response:
             if response.status_code == 200:
                 return response.json()['id']
             else:
-                raise OneDriveClientException(f"Error resolving folder path '{folder_path}': "
+                raise OneDriveClientException(f"Error resolving folder path '{valid_path}': "
                                               f"{response.status_code}, {response.text}")
         else:
-            raise OneDriveClientException(f"Cannot find {folder_path}. Please verify if this path exists.")
+            raise OneDriveClientException(f"Cannot find {valid_path}. Please verify if this path exists.")
 
     def _get_folder_contents_onedrive(self, drive_type: str, folder_id: str):
         if folder_id == 'root':
@@ -354,17 +365,17 @@ class OneDriveClient(HttpClient):
     def _process_items(self, items, folder_mask, mask, folder_path, output_dir, last_modified_at, library_name):
         for item in items:
             if item.get('folder'):
-                self._process_folder_item(
-                    item,
-                    folder_mask,
-                    mask,
-                    folder_path,
-                    output_dir,
-                    last_modified_at,
-                    library_name
-                )
+                if fnmatch.fnmatch(item['name'], folder_mask):
+                    self._process_folder_item(
+                        item,
+                        folder_mask,
+                        mask,
+                        folder_path,
+                        output_dir,
+                        last_modified_at,
+                        library_name
+                    )
             else:
-                # For files, we need to check if they match the pattern
                 if fnmatch.fnmatch(item['name'], mask):
                     self._process_file_item(item, mask, output_dir, last_modified_at)
 
@@ -414,13 +425,14 @@ class OneDriveClient(HttpClient):
         return response.json()['value']
 
     def download_files(self, file_path, output_dir, last_modified_at=None, library_name: str = None):
-        if not last_modified_at:
-            last_modified_at = datetime.strptime("2000-01-01T00:00:00", "%Y-%m-%dT%H:%M:%S")
+        self.file_mask = file_path
         folder_path, mask = self._split_path_mask(file_path)
-        logging.info(f"Downloading files matching mask {mask} from folder {folder_path}")
+
+        # Get the folder contents
         items = self._get_items_based_on_client_type(folder_path, library_name)
-        folder_mask = self._create_folder_mask(mask, folder_path)
-        self._process_items(items, folder_mask, mask, folder_path, output_dir, last_modified_at, library_name)
+
+        # Process the items
+        self._process_items(items, folder_path, mask, folder_path, output_dir, last_modified_at, library_name)
 
     @property
     def get_freshest_file_timestamp(self):
