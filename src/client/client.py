@@ -353,24 +353,25 @@ class OneDriveClient(HttpClient):
 
     def _process_items(self, items, folder_mask, mask, folder_path, output_dir, last_modified_at, library_name):
         for item in items:
-            if item.get('folder') is not None:
-                self._process_folder_item(item, folder_mask, mask, folder_path, output_dir, last_modified_at,
-                                          library_name)
-            elif item.get('file') is not None:
-                self._process_file_item(item, mask, output_dir, last_modified_at)
+            if item.get('folder'):
+                self._process_folder_item(
+                    item,
+                    folder_mask,
+                    mask,
+                    folder_path,
+                    output_dir,
+                    last_modified_at,
+                    library_name
+                )
+            else:
+                # For files, we need to check if they match the pattern
+                if fnmatch.fnmatch(item['name'], mask):
+                    self._process_file_item(item, mask, output_dir, last_modified_at)
 
     def _process_folder_item(self, item, folder_mask, mask, folder_path, output_dir, last_modified_at, library_name):
-        full_pattern = os.path.join(folder_path, mask)
-        current_path = os.path.join(folder_path, item['name'])
-
-        if not fnmatch.fnmatch(current_path, full_pattern):
-            logging.debug(f"Skipping folder {item['name']} because it doesn't match the pattern {full_pattern}")
-            return
-
         if folder_mask and not fnmatch.fnmatch(item['name'], folder_mask):
             logging.debug(f"Skipping folder {item['name']} because it doesn't match the folder_mask {folder_mask}")
             return
-
         subfolder_file_path = os.path.join(folder_path, item['name'], os.path.basename(mask))
         self.download_files(subfolder_file_path, output_dir, last_modified_at, library_name)
 
@@ -428,30 +429,29 @@ class OneDriveClient(HttpClient):
     @staticmethod
     def _split_path_mask(file_path):
         # Normalize the path to handle platform differences
-        file_path = os.path.normpath(file_path)
-        components = file_path.split(os.sep)
+        file_path = file_path.replace('\\', '/')
 
-        path = ""
-        mask = ""
+        # Split the path into components
+        path_parts = file_path.split('/')
 
-        for i, component in enumerate(components):
-            if "*" in component:
-                mask = os.sep.join(components[i:])
-                break
-            elif i == len(components) - 1 and "." in component:
-                mask = component
-            else:
-                path = os.path.join(path, component)
+        # Remove empty strings from the split result
+        path_parts = [part for part in path_parts if part]
 
-        # If mask is empty, set it to "*"
-        if not mask:
-            mask = "*"
+        # If the path is empty or just a wildcard, return appropriate defaults
+        if not path_parts:
+            return '', '*'
+        if path_parts == ['*']:
+            return '', '*'
 
-        # If path is empty or doesn't end with a separator, add one
-        if not path or path[-1] != os.sep:
-            path += os.sep
+        # Get the filename (last part) and folder path (everything else)
+        filename = path_parts[-1]
+        folder_path = '/'.join(path_parts[:-1]) if len(path_parts) > 1 else ''
 
-        return path, mask
+        # If folder path is empty but we have a filename, set folder path to root
+        if not folder_path and filename:
+            folder_path = ''
+
+        return folder_path, filename
 
     def _update_freshest_file_timestamp(self, last_modified):
         if not self.freshest_file_timestamp or last_modified > self.freshest_file_timestamp:
