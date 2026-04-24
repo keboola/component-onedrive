@@ -117,9 +117,14 @@ class OneDriveClient(HttpClient):
 
         token = response.json().get("access_token", None)
         if not token:
-            logging.error(response.json())
-            raise OneDriveClientException("Authentication failed, "
-                                          "reauthorize the extractor in extractor configuration.")
+            error_response = response.json()
+            error_code = error_response.get("error", "unknown")
+            error_description = error_response.get("error_description", "No error description provided")
+            logging.error(f"Token refresh failed (HTTP {response.status_code}): {error_code} - {error_description}")
+            raise OneDriveClientException(
+                f"Authentication failed (HTTP {response.status_code}): {error_code} - {error_description}. "
+                f"Reauthorize the extractor in extractor configuration."
+            )
 
         logging.info("New Access token fetched.")
         self.access_token = token
@@ -273,14 +278,16 @@ class OneDriveClient(HttpClient):
         url = f"https://graph.microsoft.com/v1.0/sites/{hostname}:{server_relative_path}"
         headers = {"Authorization": 'Bearer ' + self.access_token}
 
+        logging.info(f"Resolving site URL '{site_url}' via Graph API")
         response = requests.get(url, headers=headers)
 
         if response.status_code == 200:
             site = response.json()
             site_id = site['id']
+            logging.info(f"Resolved site ID: {site_id}")
             return site_id
         else:
-            raise OneDriveClientException(f"Error occurred when fetching site information: "
+            raise OneDriveClientException(f"Error occurred when fetching site information for '{site_url}': "
                                           f"{response.status_code}, {response.text}")
 
     def _get_sharepoint_document_libraries(self):
@@ -400,7 +407,10 @@ class OneDriveClient(HttpClient):
         try:
             response.raise_for_status()
         except HTTPError as e:
-            raise OneDriveClientException(f"Cannot get document libraries for site_url: {site_url}") from e
+            raise OneDriveClientException(
+                f"Cannot get document libraries for site_url '{site_url}': "
+                f"{response.status_code}, {response.text}"
+            ) from e
 
         return response.json()['value']
 
