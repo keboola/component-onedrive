@@ -103,7 +103,7 @@ class Component(ComponentBase):
                 last_error = e
                 logging.warning(f"Refresh token failed: {e}")
         raise UserException(str(last_error)) if last_error else \
-            UserException('Authentication failed, reauthorize the extractor in extractor configuration!')
+            UserException("Authentication failed, reauthorize the extractor in extractor configuration!")
 
     def _get_refresh_tokens(self) -> list[str]:
         state_file = self.get_state_file()
