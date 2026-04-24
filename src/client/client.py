@@ -102,8 +102,8 @@ class OneDriveClient(HttpClient):
         """
         This is handled using requests to handle compatibility with OneDrive and Sharepoint client.
         """
-        logging.info("Fetching New Access token")
-        request_url = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
+        logging.info(f"Fetching New Access token from {self.authority}")
+        request_url = f"{self.authority}/oauth2/v2.0/token"
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
         payload = {
             "client_id": self.client_id,
