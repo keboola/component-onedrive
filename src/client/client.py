@@ -74,7 +74,7 @@ class OneDriveClient(HttpClient):
     def _configure_onedrive_client(self):
         logging.info("Initializing OneDrive client")
         self.client_type = "OneDrive"
-        self.authority = 'https://login.microsoftonline.com/common'
+        self.auth_url = 'https://login.microsoftonline.com/common'
         self.base_url = 'https://graph.microsoft.com/v1.0/me'
         self.scope = 'User.Read Files.Read.All offline_access'
         self._get_request_tokens()
@@ -82,7 +82,7 @@ class OneDriveClient(HttpClient):
     def _configure_sharepoint_client(self):
         logging.info("Initializing Sharepoint client")
         self.client_type = "Sharepoint"
-        self.authority = f'https://login.microsoftonline.com/{self.tenant_id}'
+        self.auth_url = f'https://login.microsoftonline.com/{self.tenant_id}'
         self.scope = 'Sites.Read.All Files.Read.All offline_access'
         self.base_url = 'https://graph.microsoft.com/v1.0/sites/'
         # We need access token to get site id and url
@@ -93,7 +93,7 @@ class OneDriveClient(HttpClient):
     def _configure_onedrive_for_business_client(self):
         logging.info("Initializing OneDriveForBusiness client")
         self.client_type = "OneDriveForBusiness"
-        self.authority = f'https://login.microsoftonline.com/{self.tenant_id}'
+        self.auth_url = f'https://login.microsoftonline.com/{self.tenant_id}'
         self.base_url = 'https://graph.microsoft.com/v1.0/me/drive'
         self.scope = 'Sites.Read.All Files.Read.All offline_access'
         self._get_request_tokens()
@@ -102,8 +102,8 @@ class OneDriveClient(HttpClient):
         """
         This is handled using requests to handle compatibility with OneDrive and Sharepoint client.
         """
-        logging.info(f"Fetching New Access token from {self.authority}")
-        request_url = f"{self.authority}/oauth2/v2.0/token"
+        logging.info(f"Fetching New Access token from {self.auth_url}")
+        request_url = f"{self.auth_url}/oauth2/v2.0/token"
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
         payload = {
             "client_id": self.client_id,
