@@ -102,7 +102,7 @@ class OneDriveClient(HttpClient):
         """
         This is handled using requests to handle compatibility with OneDrive and Sharepoint client.
         """
-        logging.info(f"Fetching New Access token from {self.auth_url}")
+        logging.debug(f"Fetching new access token from {self.auth_url}")
         request_url = f"{self.auth_url}/oauth2/v2.0/token"
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
         payload = {
@@ -126,7 +126,7 @@ class OneDriveClient(HttpClient):
                 f"Reauthorize the extractor in extractor configuration."
             )
 
-        logging.info("New Access token fetched.")
+        logging.debug("New access token fetched.")
         self.access_token = token
         self._refresh_token = response.json()["refresh_token"]
 
