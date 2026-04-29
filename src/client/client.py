@@ -16,6 +16,11 @@ class OneDriveClientException(Exception):
     pass
 
 
+class OneDriveTransientException(OneDriveClientException):
+    """Raised for transient HTTP errors (429, 5xx) that are safe to retry."""
+    pass
+
+
 class OneDriveClient(HttpClient):
     """
     The OneDriveClient class manages the interaction with OneDrive API. It handles tasks such as
@@ -138,19 +143,34 @@ class OneDriveClient(HttpClient):
         return self._refresh_token
 
     def get_request(self, url: str, is_absolute_path: bool, stream: bool = False):
-        response = self.get_raw(url, is_absolute_path=is_absolute_path, stream=stream)
-        if response.status_code == 200:
-            return response
-        elif response.status_code == 401:
-            self._get_request_tokens()
-            return self.get_request(url, is_absolute_path, stream)
-        elif response.status_code == 404:
-            logging.error(f"Url {url} returned 404.")
-            return None
-        else:
-            raise OneDriveClientException(f"Cannot fetch {url}, "
-                                          f"response: {response.text}, "
-                                          f"status_code: {response.status_code}")
+        for attempt in range(2):
+            response = self.get_raw(url, is_absolute_path=is_absolute_path, stream=stream)
+            if response.status_code == 200:
+                return response
+            elif response.status_code == 404:
+                logging.error(f"Url {url} returned 404.")
+                return None
+            elif response.status_code == 401:
+                if attempt == 0:
+                    logging.warning(f"Got 401 fetching {url}, refreshing token and retrying...")
+                    self._get_request_tokens()
+                    continue
+                error_body = response.json()
+                error_code = error_body.get("error", "unknown")
+                error_desc = error_body.get("error_description", "no description")
+                raise OneDriveClientException(
+                    f"Authentication failed after token refresh (HTTP 401): "
+                    f"{error_code} - {error_desc}"
+                )
+            elif response.status_code in (429, 500, 502, 503, 504):
+                raise OneDriveTransientException(
+                    f"Transient error fetching {url}: HTTP {response.status_code} - {response.text}"
+                )
+            else:
+                raise OneDriveClientException(
+                    f"Cannot fetch {url}, response: {response.text}, "
+                    f"status_code: {response.status_code}"
+                )
 
     def _resolve_folder_id(self, drive_type: str, folder_path: str):
         if folder_path is None or folder_path == '/':
@@ -302,7 +322,7 @@ class OneDriveClient(HttpClient):
             raise OneDriveClientException(f"Error occurred when getting SharePoint document libraries:"
                                           f" {response.status_code}, {response.text}")
 
-    @backoff.on_exception(backoff.expo, Exception, max_tries=MAX_RETRIES)
+    @backoff.on_exception(backoff.expo, OneDriveTransientException, max_tries=MAX_RETRIES)
     def _download_file_from_onedrive_url(self, url, output_path, filename):
         """
         Downloads a file from OneDrive using the provided download URL and saves it to the specified output path.
