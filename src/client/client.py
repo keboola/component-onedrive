@@ -143,16 +143,17 @@ class OneDriveClient(HttpClient):
         return self._refresh_token
 
     def get_request(self, url: str, is_absolute_path: bool, stream: bool = False):
+        url_path = urlparse(url).path
         for attempt in range(2):
             response = self.get_raw(url, is_absolute_path=is_absolute_path, stream=stream)
             if response.status_code == 200:
                 return response
             elif response.status_code == 404:
-                logging.error(f"Url {url} returned 404.")
+                logging.error(f"URL {url_path} returned 404.")
                 return None
             elif response.status_code == 401:
                 if attempt == 0:
-                    logging.warning(f"Got 401 fetching {url}, refreshing token and retrying...")
+                    logging.warning(f"Got 401 fetching {url_path}, refreshing token and retrying...")
                     self._get_request_tokens()
                     continue
                 error_body = response.json()
@@ -164,11 +165,11 @@ class OneDriveClient(HttpClient):
                 )
             elif response.status_code in (429, 500, 502, 503, 504):
                 raise OneDriveTransientException(
-                    f"Transient error fetching {url}: HTTP {response.status_code} - {response.text}"
+                    f"Transient error fetching {url_path}: HTTP {response.status_code} - {response.text}"
                 )
             else:
                 raise OneDriveClientException(
-                    f"Cannot fetch {url}, response: {response.text}, "
+                    f"Cannot fetch {url_path}, response: {response.text}, "
                     f"status_code: {response.status_code}"
                 )
 
@@ -428,7 +429,7 @@ class OneDriveClient(HttpClient):
             response.raise_for_status()
         except HTTPError as e:
             raise OneDriveClientException(
-                f"Cannot get document libraries for site_url '{site_url}': "
+                f"Cannot get document libraries for site URL '{site_url}': "
                 f"{response.status_code}, {response.text}"
             ) from e
 
@@ -440,6 +441,13 @@ class OneDriveClient(HttpClient):
         folder_path, mask = self._split_path_mask(file_path)
         logging.info(f"Downloading files matching mask {mask} from folder {folder_path}")
         items = self._get_items_based_on_client_type(folder_path, library_name)
+        files = [i for i in items if i.get("file")]
+        folders = [i for i in items if i.get("folder")]
+        unknown = len(items) - len(files) - len(folders)
+        breakdown = f"{len(files)} files, {len(folders)} subfolders"
+        if unknown:
+            breakdown += f", {unknown} unknown"
+        logging.info(f"Found {len(items)} items ({breakdown}) in '{folder_path}'")
         folder_mask = self._create_folder_mask(mask, folder_path)
         self._process_items(items, folder_mask, mask, folder_path, output_dir, last_modified_at, library_name)
 
