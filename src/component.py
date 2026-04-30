@@ -2,20 +2,19 @@ import json
 import logging
 import os
 from datetime import datetime
-from typing import List, Union, Any
+from typing import Any
 
 from keboola.component.base import ComponentBase, sync_action
 from keboola.component.exceptions import UserException
 from keboola.component.sync_actions import SelectElement
 
 from client.client import OneDriveClient, OneDriveClientException
-from configuration import Configuration, Account
+from configuration import Account, Configuration
 
 KEY_STATE_REFRESH_TOKEN = "#refresh_token"
 
 
 class Component(ComponentBase):
-
     def __init__(self):
         super().__init__()
         self._configuration: Configuration
@@ -32,8 +31,9 @@ class Component(ComponentBase):
 
         if not file_path:
             file_path = "*"
-            logging.warning("File path is not set, the component will try to download everything "
-                            "from authorized drive!")
+            logging.warning(
+                "File path is not set, the component will try to download everything from authorized drive!"
+            )
 
         library_name = self._configuration.account.library_name
 
@@ -42,8 +42,12 @@ class Component(ComponentBase):
         client = self._get_client(self._configuration.account)
 
         try:
-            client.download_files(file_path=file_path, output_dir=self.files_out_path,
-                                  last_modified_at=last_modified_at, library_name=library_name)
+            client.download_files(
+                file_path=file_path,
+                output_dir=self.files_out_path,
+                last_modified_at=last_modified_at,
+                library_name=library_name,
+            )
         except OneDriveClientException as e:
             raise UserException(e) from e
 
@@ -71,7 +75,7 @@ class Component(ComponentBase):
             file_def = self.create_out_file_definition(filename, tags=tags, is_permanent=permanent)
             self.write_manifest(file_def)
 
-    def _set_last_modified(self, state_file) -> Union[str, Any]:
+    def _set_last_modified(self, state_file) -> str | Any:
         get_new_only = self._configuration.settings.new_files_only
         last_modified_at = False
         if get_new_only:
@@ -79,9 +83,11 @@ class Component(ComponentBase):
                 last_modified_at = datetime.fromisoformat(state_file.get("last_modified"))
                 logging.info(f"Component will download files with lastModifiedDateTime > {last_modified_at}")
             else:
-                logging.warning("last_modified timestamp not found in statefile, Cannot download new files only. "
-                                "To resolve this, disable this option in row config or "
-                                "set last_modified in statefile manually.")
+                logging.warning(
+                    "last_modified timestamp not found in statefile, Cannot download new files only. "
+                    "To resolve this, disable this option in row config or "
+                    "set last_modified in statefile manually."
+                )
         return last_modified_at
 
     def _init_configuration(self) -> None:
@@ -94,16 +100,24 @@ class Component(ComponentBase):
         last_error = None
         for refresh_token in self._get_refresh_tokens():
             try:
-                client = OneDriveClient(refresh_token=refresh_token, files_out_folder=self.files_out_path,
-                                        client_id=self.client_id, client_secret=self.client_secret,
-                                        tenant_id=tenant_id, site_url=site_url)
+                client = OneDriveClient(
+                    refresh_token=refresh_token,
+                    files_out_folder=self.files_out_path,
+                    client_id=self.client_id,
+                    client_secret=self.client_secret,
+                    tenant_id=tenant_id,
+                    site_url=site_url,
+                )
                 self._save_refresh_token_state(client.refresh_token)
                 return client
             except OneDriveClientException as e:
                 last_error = e
                 logging.warning(f"Refresh token failed: {e}")
-        raise UserException(str(last_error)) if last_error else \
-            UserException("Authentication failed, reauthorize the extractor in extractor configuration!")
+        raise (
+            UserException(str(last_error))
+            if last_error
+            else UserException("Authentication failed, reauthorize the extractor in extractor configuration!")
+        )
 
     def _get_refresh_tokens(self) -> list[str]:
         state_file = self.get_state_file()
@@ -113,16 +127,15 @@ class Component(ComponentBase):
         return [token for token in [state_refresh_token, self.refresh_token] if token]
 
     def _save_refresh_token_state(self, new_refresh_token):
-        self._save_to_state(
-            {self.configuration.oauth_credentials.id: {KEY_STATE_REFRESH_TOKEN: new_refresh_token}})
+        self._save_to_state({self.configuration.oauth_credentials.id: {KEY_STATE_REFRESH_TOKEN: new_refresh_token}})
 
     def _save_to_state(self, data: dict) -> None:
         # if not state file exists create it
-        if not os.path.exists(os.path.join(self.configuration.data_dir, 'out', 'state.json')):
-            with open(os.path.join(self.configuration.data_dir, 'out', 'state.json'), 'w+') as state_file:
+        if not os.path.exists(os.path.join(self.configuration.data_dir, "out", "state.json")):
+            with open(os.path.join(self.configuration.data_dir, "out", "state.json"), "w+") as state_file:
                 json.dump(data, state_file)
         else:
-            with open(os.path.join(self.configuration.data_dir, 'out', 'state.json'), 'r+') as state_file:
+            with open(os.path.join(self.configuration.data_dir, "out", "state.json"), "r+") as state_file:
                 actual_data = json.load(state_file)
                 state_file.seek(0)  # Move the cursor to the beginning of the file
                 new_data = {**actual_data, **data}
@@ -130,10 +143,10 @@ class Component(ComponentBase):
                 state_file.truncate()  # Remove remaining part if the new data is shorter
 
     @sync_action("listLibraries")
-    def list_sharepoint_libraries(self) -> List[SelectElement]:
+    def list_sharepoint_libraries(self) -> list[SelectElement]:
         account_json = self.configuration.parameters.get("account", {})
         required_parameters = ["tenant_id", "site_url"]
-        self._validate_parameters(account_json, required_parameters, 'Credentials')
+        self._validate_parameters(account_json, required_parameters, "Credentials")
 
         acc_config = Account.load_from_dict(account_json)
 
@@ -143,8 +156,8 @@ class Component(ComponentBase):
 
         return [
             SelectElement(
-                label=library['name'],
-                value="Shared Documents" if library['name'] == "Documents" else library['webUrl'].split("/")[-1]
+                label=library["name"],
+                value="Shared Documents" if library["name"] == "Documents" else library["webUrl"].split("/")[-1],
             )
             for library in libraries
         ]

@@ -1,7 +1,6 @@
 import dataclasses
 import json
 from dataclasses import dataclass
-from typing import List
 
 import dataconf
 
@@ -33,16 +32,17 @@ class ConfigurationBase:
         return dataconf.loads(json_conf, cls, ignore_unexpected=True)
 
     @classmethod
-    def get_dataclass_required_parameters(cls) -> List[str]:
+    def get_dataclass_required_parameters(cls) -> list[str]:
         """
         Return list of required parameters based on the dataclass definition (no default value)
         Returns: List[str]
 
         """
-        return [cls._convert_private_value_inv(f.name)
-                for f in dataclasses.fields(cls)
-                if f.default == dataclasses.MISSING
-                and f.default_factory == dataclasses.MISSING]
+        return [
+            cls._convert_private_value_inv(f.name)
+            for f in dataclasses.fields(cls)
+            if f.default == dataclasses.MISSING and f.default_factory == dataclasses.MISSING
+        ]
 
 
 @dataclass
