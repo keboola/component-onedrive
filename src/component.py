@@ -1,7 +1,7 @@
 import json
 import logging
-import os
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from keboola.component.base import ComponentBase, sync_action
@@ -130,12 +130,12 @@ class Component(ComponentBase):
         self._save_to_state({self.configuration.oauth_credentials.id: {KEY_STATE_REFRESH_TOKEN: new_refresh_token}})
 
     def _save_to_state(self, data: dict) -> None:
-        # if not state file exists create it
-        if not os.path.exists(os.path.join(self.configuration.data_dir, "out", "state.json")):
-            with open(os.path.join(self.configuration.data_dir, "out", "state.json"), "w+") as state_file:
+        state_path = Path(self.configuration.data_dir) / "out" / "state.json"
+        if not state_path.exists():
+            with state_path.open("w+") as state_file:
                 json.dump(data, state_file)
         else:
-            with open(os.path.join(self.configuration.data_dir, "out", "state.json"), "r+") as state_file:
+            with state_path.open("r+") as state_file:
                 actual_data = json.load(state_file)
                 state_file.seek(0)  # Move the cursor to the beginning of the file
                 new_data = {**actual_data, **data}

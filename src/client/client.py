@@ -2,6 +2,7 @@ import fnmatch
 import logging
 import os
 from datetime import datetime
+from pathlib import Path
 from urllib.parse import urlparse
 
 import backoff
@@ -407,7 +408,7 @@ class OneDriveClient(HttpClient):
         if folder_mask and not fnmatch.fnmatch(item["name"], folder_mask):
             logging.debug(f"Skipping folder {item['name']} because it doesn't match the folder_mask {folder_mask}")
             return
-        subfolder_file_path = os.path.join(folder_path, item["name"], os.path.basename(mask))
+        subfolder_file_path = str(Path(folder_path) / item["name"] / Path(mask).name)
         self.download_files(subfolder_file_path, output_dir, last_modified_at, library_name)
 
     def _process_file_item(self, item, mask, output_dir, last_modified_at):
@@ -420,7 +421,7 @@ class OneDriveClient(HttpClient):
             logging.debug(f"Skipping file {item['name']} because it was last modified before {last_modified_at}.")
             return
         file_url = item["@microsoft.graph.downloadUrl"]
-        output_path = os.path.join(output_dir, item["name"])
+        output_path = str(Path(output_dir) / item["name"])
         self._download_file_from_onedrive_url(file_url, output_path, filename=item["name"])
 
     def get_document_libraries(self, site_url):
