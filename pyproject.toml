@@ -13,8 +13,10 @@ dependencies = [
 dev = [
     "freezegun>=1.5.5",
     "mock>=5.2.0",
+    "pre-commit>=4.6.0",
     "pytest>=9.0.3",
     "ruff>=0.15.12",
+    "ty>=0.0.33",
 ]
 
 [tool.pytest.ini_options]
