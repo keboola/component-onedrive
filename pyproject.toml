@@ -1,0 +1,28 @@
+[project]
+name = "component-onedrive"
+version = "0.1.0"
+requires-python = "~=3.14.0"
+dependencies = [
+    "backoff==2.2.1",
+    "dataconf==2.2.1",
+    "keboola-component==1.4.4",
+    "keboola-http-client==1.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "freezegun>=1.5.5",
+    "mock>=5.2.0",
+    "pytest>=9.0.3",
+    "ruff>=0.15.12",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+extend-select = ["I", "UP"]
