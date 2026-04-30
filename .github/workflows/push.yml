@@ -1,11 +1,11 @@
 name: Keboola Component Build & Deploy Pipeline
 on:
   push:
-    branches:
-      - 'feature/*'
-      - 'bug/*'
+    branches-ignore:
+      - main
     tags:
-      - '*' # Skip the workflow on the main branch without tags
+      - "*"  # Skip the workflow on the main branch without tags
+  workflow_dispatch:
 
 concurrency: ci-${{ github.ref }} # to avoid tag collisions in the ECR
 env:
@@ -47,7 +47,7 @@ jobs:
             echo "branch_name=$branch_name" | tee -a $GITHUB_OUTPUT
           else
             raw=$(git branch -r --contains ${{ github.ref }})
-            branch="$(echo $raw | sed "s/.*origin\///" | tr -d '\n')"
+            branch="$(echo ${raw/*origin\//} | tr -d '\n')"
             echo "branch_name=$branch" | tee -a $GITHUB_OUTPUT
           fi
 
@@ -64,8 +64,13 @@ jobs:
       - name: Set image tag
         id: tag
         run: |
-          TAG="${GITHUB_REF##*/}"
-          IS_SEMANTIC_TAG=$(echo "$TAG" | grep -q '^v\?[0-9]\+\.[0-9]\+\.[0-9]\+$' && echo true || echo false)
+          REF="${GITHUB_REF##*/}"
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            TAG="$REF"
+          else
+            TAG="$REF-${{ github.run_number }}"
+          fi
+          IS_SEMANTIC_TAG=$(echo "$REF" | grep -q '^[0-9]\+\.[0-9]\+\.[0-9]\+$' && echo true || echo false)
           echo "is_semantic_tag=$IS_SEMANTIC_TAG" | tee -a $GITHUB_OUTPUT
           echo "app_image_tag=$TAG" | tee -a $GITHUB_OUTPUT
 
