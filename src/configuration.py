@@ -19,15 +19,7 @@ class ConfigurationBase:
 
     @classmethod
     def load_from_dict(cls, configuration: dict):
-        """
-        Initialize the configuration dataclass object from dictionary.
-        Args:
-            configuration: Dictionary loaded from json configuration.
-
-        Returns:
-
-        """
-        json_conf = json.dumps(configuration)
+        json_conf = json.dumps(configuration, ensure_ascii=False)
         json_conf = ConfigurationBase._convert_private_value(json_conf)
         return dataconf.loads(json_conf, cls, ignore_unexpected=True)
 

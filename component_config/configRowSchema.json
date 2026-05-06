@@ -12,7 +12,7 @@
           "title": "File path",
           "default": "*",
           "propertyOrder": 1,
-          "description": "Source file path with its extension or wildcard"
+          "description": "Source file path. You can use `*` as a wildcard."
         },
         "new_files_only": {
           "type": "boolean",
