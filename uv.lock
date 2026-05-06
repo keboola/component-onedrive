@@ -85,7 +85,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "backoff" },
-    { name = "dataconf" },
+    { name = "dacite" },
     { name = "keboola-component" },
     { name = "keboola-http-client" },
 ]
@@ -102,10 +102,10 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "backoff", specifier = "==2.2.1" },
-    { name = "dataconf", specifier = "==2.2.1" },
-    { name = "keboola-component", specifier = "==1.4.4" },
-    { name = "keboola-http-client", specifier = "==1.0.0" },
+    { name = "backoff", specifier = ">=2.2.1" },
+    { name = "dacite", specifier = ">=1.9.2" },
+    { name = "keboola-component", specifier = ">=1.4.4" },
+    { name = "keboola-http-client", specifier = ">=1.0.0" },
 ]
 
 [package.metadata.requires-dev]
@@ -119,17 +119,12 @@ dev = [
 ]
 
 [[package]]
-name = "dataconf"
-version = "2.2.1"
+name = "dacite"
+version = "1.9.2"
 source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "pyhocon" },
-    { name = "python-dateutil" },
-    { name = "pyyaml" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/2a/f0/1fe1a597eb49af4ed17c1b161d882d4486fb7fbd3f7aece589cf5b090199/dataconf-2.2.1.tar.gz", hash = "sha256:3c2292634a740da1d5842f2ecbad4192205cb388648765b2f32559c8ae5ec93f", size = 15672, upload-time = "2023-05-26T17:46:48.281Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/55/a0/7ca79796e799a3e782045d29bf052b5cde7439a2bbb17f15ff44f7aacc63/dacite-1.9.2.tar.gz", hash = "sha256:6ccc3b299727c7aa17582f0021f6ae14d5de47c7227932c47fec4cdfefd26f09", size = 22420, upload-time = "2025-02-05T09:27:29.757Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/44/2b/f76f5b45eb5db3a304e09ca7c6e291f52384bbb877837004dd316136dbfc/dataconf-2.2.1-py3-none-any.whl", hash = "sha256:537e027297dd8afd4103bed1dcec58322dbdb9bea1815df41a98131b83594772", size = 15364, upload-time = "2023-05-26T17:46:46.409Z" },
+    { url = "https://files.pythonhosted.org/packages/94/35/386550fd60316d1e37eccdda609b074113298f23cef5bddb2049823fe666/dacite-1.9.2-py3-none-any.whl", hash = "sha256:053f7c3f5128ca2e9aceb66892b1a3c8936d02c686e707bee96e19deef4bc4a0", size = 16600, upload-time = "2025-02-05T09:27:24.345Z" },
 ]
 
 [[package]]
@@ -304,24 +299,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/c3/b2/bc9c9196916376152d655522fdcebac55e66de6603a76a02bca1b6414f6c/pygments-2.20.0.tar.gz", hash = "sha256:6757cd03768053ff99f3039c1a36d6c0aa0b263438fcab17520b30a303a82b5f", size = 4955991, upload-time = "2026-03-29T13:29:33.898Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f4/7e/a72dd26f3b0f4f2bf1dd8923c85f7ceb43172af56d63c7383eb62b332364/pygments-2.20.0-py3-none-any.whl", hash = "sha256:81a9e26dd42fd28a23a2d169d86d7ac03b46e2f8b59ed4698fb4785f946d0176", size = 1231151, upload-time = "2026-03-29T13:29:30.038Z" },
-]
-
-[[package]]
-name = "pyhocon"
-version = "0.3.60"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "pyparsing" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/9d/05/36397967e9f9abd3eb64006ffc4c766dc5d6bfd218bbbfef84acc4395e6b/pyhocon-0.3.60.tar.gz", hash = "sha256:ea18520ea126981e5320a72281f1a5fef2c27923f70cc54e1bd241c26525fd4b", size = 158763, upload-time = "2023-02-12T04:40:29.198Z" }
-
-[[package]]
-name = "pyparsing"
-version = "3.3.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/f3/91/9c6ee907786a473bf81c5f53cf703ba0957b23ab84c264080fb5a450416f/pyparsing-3.3.2.tar.gz", hash = "sha256:c777f4d763f140633dcb6d8a3eda953bf7a214dc4eff598413c070bcdc117cbc", size = 6851574, upload-time = "2026-01-21T03:57:59.36Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/10/bd/c038d7cc38edc1aa5bf91ab8068b63d4308c66c4c8bb3cbba7dfbc049f9c/pyparsing-3.3.2-py3-none-any.whl", hash = "sha256:850ba148bd908d7e2411587e247a1e4f0327839c40e2e5e6d05a007ecc69911d", size = 122781, upload-time = "2026-01-21T03:57:55.912Z" },
 ]
 
 [[package]]

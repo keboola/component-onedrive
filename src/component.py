@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import dacite
 from keboola.component.base import ComponentBase, sync_action
 from keboola.component.exceptions import UserException
 from keboola.component.sync_actions import SelectElement
@@ -91,8 +92,10 @@ class Component(ComponentBase):
         return last_modified_at
 
     def _init_configuration(self) -> None:
-        self.validate_configuration_parameters(Configuration.get_dataclass_required_parameters())
-        self._configuration: Configuration = Configuration.load_from_dict(self.configuration.parameters)
+        try:
+            self._configuration: Configuration = dacite.from_dict(Configuration, self.configuration.parameters)
+        except dacite.exceptions.DaciteError as e:
+            raise UserException(f"Invalid configuration: {e}") from e
 
     def _get_client(self, account_params: Account) -> OneDriveClient:
         tenant_id = account_params.tenant_id
@@ -148,7 +151,7 @@ class Component(ComponentBase):
         required_parameters = ["tenant_id", "site_url"]
         self._validate_parameters(account_json, required_parameters, "Credentials")
 
-        acc_config = Account.load_from_dict(account_json)
+        acc_config = dacite.from_dict(Account, account_json)
 
         client = self._get_client(acc_config)
 
