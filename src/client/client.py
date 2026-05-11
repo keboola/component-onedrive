@@ -164,7 +164,7 @@ class OneDriveClient(HttpClient):
             raise OneDriveClientException(f"Drive response missing id: {response.json()}") from err
 
     def _resolve_scope_folder_id(self, drive_id: str, folder_path: str) -> str:
-        normalized = (folder_path or "").strip("/").replace("\\", "/")
+        normalized = (folder_path or "").strip("/").strip()
         if not normalized:
             return "root"
         encoded = quote(normalized, safe="/")

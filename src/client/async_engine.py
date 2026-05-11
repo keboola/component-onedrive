@@ -51,7 +51,7 @@ class AsyncDriveEngine:
     ) -> None:
         self.drive_id = drive_id
         self.scope_folder_id = scope_folder_id or "root"
-        self.scope_folder_path = (scope_folder_path or "").strip("/").replace("\\", "/")
+        self.scope_folder_path = (scope_folder_path or "").strip("/").strip()
         self.mask = mask or "*"
         self.output_dir = output_dir
         self.last_modified_at = last_modified_at
