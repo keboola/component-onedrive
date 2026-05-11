@@ -1,10 +1,11 @@
 import hashlib
 import json
 import logging
-import os
 from datetime import datetime
-from typing import Any, List, Optional, Union
+from pathlib import Path
+from typing import Any
 
+import dacite
 from keboola.component.base import ComponentBase, sync_action
 from keboola.component.exceptions import UserException
 from keboola.component.sync_actions import SelectElement
@@ -19,7 +20,6 @@ KEY_STATE_DELTA_FINGERPRINT = "fingerprint"
 
 
 class Component(ComponentBase):
-
     def __init__(self):
         super().__init__()
         self._configuration: Configuration
@@ -36,8 +36,9 @@ class Component(ComponentBase):
 
         if not file_path:
             file_path = "*"
-            logging.warning("File path is not set, the component will try to download everything "
-                            "from authorized drive!")
+            logging.warning(
+                "File path is not set, the component will try to download everything from authorized drive!"
+            )
 
         library_name = self._configuration.account.library_name
 
@@ -74,16 +75,18 @@ class Component(ComponentBase):
         token_url = getattr(client, "new_delta_token_url", None)
         if not token_url:
             return
-        self._save_to_state({
-            KEY_STATE_DELTA: {
-                KEY_STATE_DELTA_FINGERPRINT: fingerprint,
-                KEY_STATE_DELTA_TOKEN: token_url,
+        self._save_to_state(
+            {
+                KEY_STATE_DELTA: {
+                    KEY_STATE_DELTA_FINGERPRINT: fingerprint,
+                    KEY_STATE_DELTA_TOKEN: token_url,
+                }
             }
-        })
+        )
         logging.info("Stored Graph delta token for incremental sync on next run.")
 
     @staticmethod
-    def _load_delta_token(state_file: dict, fingerprint: str) -> Optional[str]:
+    def _load_delta_token(state_file: dict, fingerprint: str) -> str | None:
         delta = state_file.get(KEY_STATE_DELTA) or {}
         if delta.get(KEY_STATE_DELTA_FINGERPRINT) != fingerprint:
             if delta:
@@ -116,7 +119,7 @@ class Component(ComponentBase):
             file_def = self.create_out_file_definition(filename, tags=tags, is_permanent=permanent)
             self.write_manifest(file_def)
 
-    def _set_last_modified(self, state_file) -> Union[str, Any]:
+    def _set_last_modified(self, state_file) -> str | Any:
         get_new_only = self._configuration.settings.new_files_only
         last_modified_at = False
         if get_new_only:
@@ -124,29 +127,43 @@ class Component(ComponentBase):
                 last_modified_at = datetime.fromisoformat(state_file.get("last_modified"))
                 logging.info(f"Component will download files with lastModifiedDateTime > {last_modified_at}")
             else:
-                logging.warning("last_modified timestamp not found in statefile, Cannot download new files only. "
-                                "To resolve this, disable this option in row config or "
-                                "set last_modified in statefile manually.")
+                logging.warning(
+                    "last_modified timestamp not found in statefile, Cannot download new files only. "
+                    "To resolve this, disable this option in row config or "
+                    "set last_modified in statefile manually."
+                )
         return last_modified_at
 
     def _init_configuration(self) -> None:
-        self.validate_configuration_parameters(Configuration.get_dataclass_required_parameters())
-        self._configuration: Configuration = Configuration.load_from_dict(self.configuration.parameters)
+        try:
+            self._configuration: Configuration = dacite.from_dict(Configuration, self.configuration.parameters)
+        except dacite.exceptions.DaciteError as e:
+            raise UserException(f"Invalid configuration: {e}") from e
 
     def _get_client(self, account_params: Account) -> OneDriveClient:
         tenant_id = account_params.tenant_id
         site_url = account_params.site_url
+        last_error = None
         for refresh_token in self._get_refresh_tokens():
             try:
-                client = OneDriveClient(refresh_token=refresh_token, files_out_folder=self.files_out_path,
-                                        client_id=self.client_id, client_secret=self.client_secret,
-                                        tenant_id=tenant_id, site_url=site_url)
+                client = OneDriveClient(
+                    refresh_token=refresh_token,
+                    files_out_folder=self.files_out_path,
+                    client_id=self.client_id,
+                    client_secret=self.client_secret,
+                    tenant_id=tenant_id,
+                    site_url=site_url,
+                )
                 self._save_refresh_token_state(client.refresh_token)
                 return client
-            except OneDriveClientException:
-                logging.warning("Refresh token failed, retrying connection with new refresh token.")
-                pass
-        raise UserException('Authentication failed, reauthorize the extractor in extractor configuration!')
+            except OneDriveClientException as e:
+                last_error = e
+                logging.warning(f"Refresh token failed: {e}")
+        raise (
+            UserException(str(last_error))
+            if last_error
+            else UserException("Authentication failed, reauthorize the extractor in extractor configuration!")
+        )
 
     def _get_refresh_tokens(self) -> list[str]:
         state_file = self.get_state_file()
@@ -156,16 +173,15 @@ class Component(ComponentBase):
         return [token for token in [state_refresh_token, self.refresh_token] if token]
 
     def _save_refresh_token_state(self, new_refresh_token):
-        self._save_to_state(
-            {self.configuration.oauth_credentials.id: {KEY_STATE_REFRESH_TOKEN: new_refresh_token}})
+        self._save_to_state({self.configuration.oauth_credentials.id: {KEY_STATE_REFRESH_TOKEN: new_refresh_token}})
 
     def _save_to_state(self, data: dict) -> None:
-        state_path = os.path.join(self.configuration.data_dir, 'out', 'state.json')
-        if not os.path.exists(state_path):
-            with open(state_path, 'w+') as state_file:
+        state_path = Path(self.configuration.data_dir) / "out" / "state.json"
+        if not state_path.exists():
+            with state_path.open("w+") as state_file:
                 json.dump(data, state_file)
         else:
-            with open(state_path, 'r+') as state_file:
+            with state_path.open("r+") as state_file:
                 actual_data = json.load(state_file)
                 state_file.seek(0)
                 new_data = {**actual_data, **data}
@@ -173,12 +189,12 @@ class Component(ComponentBase):
                 state_file.truncate()
 
     @sync_action("listLibraries")
-    def list_sharepoint_libraries(self) -> List[SelectElement]:
+    def list_sharepoint_libraries(self) -> list[SelectElement]:
         account_json = self.configuration.parameters.get("account", {})
         required_parameters = ["tenant_id", "site_url"]
-        self._validate_parameters(account_json, required_parameters, 'Credentials')
+        self._validate_parameters(account_json, required_parameters, "Credentials")
 
-        acc_config = Account.load_from_dict(account_json)
+        acc_config = dacite.from_dict(Account, account_json)
 
         client = self._get_client(acc_config)
 
@@ -186,8 +202,8 @@ class Component(ComponentBase):
 
         return [
             SelectElement(
-                label=library['name'],
-                value="Shared Documents" if library['name'] == "Documents" else library['webUrl'].split("/")[-1]
+                label=library["name"],
+                value="Shared Documents" if library["name"] == "Documents" else library["webUrl"].split("/")[-1],
             )
             for library in libraries
         ]

@@ -3,13 +3,11 @@ import logging
 import os
 import time
 from datetime import datetime
-from typing import Optional
 from urllib.parse import quote, urlparse
 
 import requests
-from requests.exceptions import HTTPError
-
 from keboola.http_client import HttpClient
+from requests.exceptions import HTTPError
 
 from . import exceptions
 from .async_engine import AsyncDriveEngine
@@ -31,14 +29,17 @@ class OneDriveClient(HttpClient):
     MAX_RETRIES = 5
     TOKEN_REFRESH_LEEWAY_SECONDS = 300
 
-    def __init__(self, refresh_token, files_out_folder, client_id, client_secret,
-                 tenant_id=None, site_url=None):
+    def __init__(self, refresh_token, files_out_folder, client_id, client_secret, tenant_id=None, site_url=None):
         self.base_url = ""
         self.access_token = ""
         self._access_token_expiry: float = 0.0
 
-        super().__init__(base_url=self.base_url, max_retries=self.MAX_RETRIES, backoff_factor=0.3,
-                         status_forcelist=(429, 503, 500, 502, 504))
+        super().__init__(
+            base_url=self.base_url,
+            max_retries=self.MAX_RETRIES,
+            backoff_factor=0.3,
+            status_forcelist=(429, 503, 500, 502, 504),
+        )
 
         self.files_out_folder = files_out_folder
         self._refresh_token = refresh_token
@@ -50,9 +51,9 @@ class OneDriveClient(HttpClient):
         self._configure_client()
 
         self.downloaded_files: list[str] = []
-        self.freshest_file_timestamp: Optional[datetime] = None
-        self.new_delta_token_url: Optional[str] = None
-        self._drive_id: Optional[str] = None
+        self.freshest_file_timestamp: datetime | None = None
+        self.new_delta_token_url: str | None = None
+        self._drive_id: str | None = None
 
     def _configure_client(self):
         if not self.tenant_id and not self.site_url:
@@ -67,17 +68,17 @@ class OneDriveClient(HttpClient):
     def _configure_onedrive_client(self):
         logging.info("Initializing OneDrive client")
         self.client_type = "OneDrive"
-        self.authority = 'https://login.microsoftonline.com/common'
-        self.base_url = 'https://graph.microsoft.com/v1.0/me'
-        self.scope = 'User.Read Files.Read.All offline_access'
+        self.auth_url = "https://login.microsoftonline.com/common"
+        self.base_url = "https://graph.microsoft.com/v1.0/me"
+        self.scope = "User.Read Files.Read.All offline_access"
         self._get_request_tokens()
 
     def _configure_sharepoint_client(self):
         logging.info("Initializing Sharepoint client")
         self.client_type = "Sharepoint"
-        self.authority = f'https://login.microsoftonline.com/{self.tenant_id}'
-        self.scope = 'Sites.Read.All Files.Read.All offline_access'
-        self.base_url = 'https://graph.microsoft.com/v1.0/sites/'
+        self.auth_url = f"https://login.microsoftonline.com/{self.tenant_id}"
+        self.scope = "Sites.Read.All Files.Read.All offline_access"
+        self.base_url = "https://graph.microsoft.com/v1.0/sites/"
         self._get_request_tokens()
         site_id = self.get_site_id_from_url(self.site_url)
         self.base_url = self.base_url + site_id
@@ -85,14 +86,14 @@ class OneDriveClient(HttpClient):
     def _configure_onedrive_for_business_client(self):
         logging.info("Initializing OneDriveForBusiness client")
         self.client_type = "OneDriveForBusiness"
-        self.authority = f'https://login.microsoftonline.com/{self.tenant_id}'
-        self.base_url = 'https://graph.microsoft.com/v1.0/me/drive'
-        self.scope = 'Sites.Read.All Files.Read.All offline_access'
+        self.auth_url = f"https://login.microsoftonline.com/{self.tenant_id}"
+        self.base_url = "https://graph.microsoft.com/v1.0/me/drive"
+        self.scope = "Sites.Read.All Files.Read.All offline_access"
         self._get_request_tokens()
 
     def _get_request_tokens(self) -> None:
-        logging.info("Fetching New Access token")
-        request_url = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
+        logging.debug(f"Fetching new access token from {self.auth_url}")
+        request_url = f"{self.auth_url}/oauth2/v2.0/token"
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
         payload = {
             "client_id": self.client_id,
@@ -106,23 +107,27 @@ class OneDriveClient(HttpClient):
         body = response.json()
         token = body.get("access_token")
         if not token:
-            logging.error(body)
-            raise OneDriveClientException("Authentication failed, "
-                                          "reauthorize the extractor in extractor configuration.")
+            error_code = body.get("error", "unknown")
+            error_description = body.get("error_description", "No error description provided")
+            logging.error(f"Token refresh failed (HTTP {response.status_code}): {error_code} - {error_description}")
+            raise OneDriveClientException(
+                f"Authentication failed (HTTP {response.status_code}): {error_code} - {error_description}. "
+                f"Reauthorize the extractor in extractor configuration."
+            )
 
         expires_in = int(body.get("expires_in", 3600))
         self._access_token_expiry = time.monotonic() + expires_in
 
-        logging.info("New Access token fetched (expires in %ss).", expires_in)
+        logging.debug("New access token fetched (expires in %ss).", expires_in)
         self.access_token = token
         self._refresh_token = body["refresh_token"]
 
-        new_header = {"Authorization": 'Bearer ' + self.access_token, "Content-Type": "application/json"}
+        new_header = {"Authorization": "Bearer " + self.access_token, "Content-Type": "application/json"}
         self.update_auth_header(updated_header=new_header, overwrite=True)
 
     def _ensure_token_fresh(self) -> None:
         if time.monotonic() + self.TOKEN_REFRESH_LEEWAY_SECONDS >= self._access_token_expiry:
-            logging.info("Access token close to expiry; refreshing proactively.")
+            logging.debug("Access token close to expiry; refreshing proactively.")
             self._get_request_tokens()
 
     @property
@@ -130,20 +135,30 @@ class OneDriveClient(HttpClient):
         return self._refresh_token
 
     def get_request(self, url: str, is_absolute_path: bool, stream: bool = False):
+        url_path = urlparse(url).path
         self._ensure_token_fresh()
-        response = self.get_raw(url, is_absolute_path=is_absolute_path, stream=stream)
-        if response.status_code == 200:
-            return response
-        elif response.status_code == 401:
-            self._get_request_tokens()
-            return self.get_request(url, is_absolute_path, stream)
-        elif response.status_code == 404:
-            logging.error(f"Url {url} returned 404.")
-            return None
-        else:
-            raise OneDriveClientException(f"Cannot fetch {url}, "
-                                          f"response: {response.text}, "
-                                          f"status_code: {response.status_code}")
+        for attempt in range(2):
+            response = self.get_raw(url, is_absolute_path=is_absolute_path, stream=stream)
+            if response.status_code == 200:
+                return response
+            elif response.status_code == 404:
+                logging.error(f"URL {url_path} returned 404.")
+                return None
+            elif response.status_code == 401:
+                if attempt == 0:
+                    logging.warning(f"Got 401 fetching {url_path}, refreshing token and retrying...")
+                    self._get_request_tokens()
+                    continue
+                error_body = response.json()
+                error_code = error_body.get("error", "unknown")
+                error_desc = error_body.get("error_description", "no description")
+                raise OneDriveClientException(
+                    f"Authentication failed after token refresh (HTTP 401): {error_code} - {error_desc}"
+                )
+            else:
+                raise OneDriveClientException(
+                    f"Cannot fetch {url_path}, response: {response.text}, status_code: {response.status_code}"
+                )
 
     # ---------------------------------------------------------------- drive resolution
 
@@ -159,7 +174,7 @@ class OneDriveClient(HttpClient):
         if not response or response.status_code != 200:
             raise OneDriveClientException(f"Cannot resolve drive id via {url}")
         try:
-            return response.json()['id']
+            return response.json()["id"]
         except KeyError as err:
             raise OneDriveClientException(f"Drive response missing id: {response.json()}") from err
 
@@ -171,38 +186,37 @@ class OneDriveClient(HttpClient):
         url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root:/{encoded}:/"
         response = self.get_request(url, is_absolute_path=True)
         if response is None:
-            raise OneDriveClientException(
-                f"Cannot find folder '{folder_path}'. Please verify if this path exists."
-            )
+            raise OneDriveClientException(f"Cannot find folder '{folder_path}'. Please verify if this path exists.")
         if response.status_code != 200:
             raise OneDriveClientException(
                 f"Error resolving folder path '{folder_path}': {response.status_code}, {response.text}"
             )
-        return response.json()['id']
+        return response.json()["id"]
 
     # ---------------------------------------------------------------- sharepoint helpers
 
     def _get_sharepoint_library_id(self, library_name):
         libraries = self._get_sharepoint_document_libraries()
         logging.debug(f"Found libraries: {libraries}")
-        library = next((lib for lib in libraries if lib['name'] == library_name), None)
+        library = next((lib for lib in libraries if lib["name"] == library_name), None)
         if library is None:
-            library = next((lib for lib in libraries if lib['webUrl'].split("/")[-1] == library_name), None)
+            library = next((lib for lib in libraries if lib["webUrl"].split("/")[-1] == library_name), None)
         if library is None:
             raise OneDriveClientException(f"Library '{library_name}' not found")
-        return library['id']
+        return library["id"]
 
     def _get_sharepoint_library_drive_id(self, library_id):
         url = f"{self.base_url}/lists/{library_id}/drive"
         response = self.get_request(url, is_absolute_path=True)
         if response and response.status_code == 200:
             try:
-                return response.json()['id']
+                return response.json()["id"]
             except KeyError:
                 raise OneDriveClientException(f"Error fetching library drive: {response.json()}")
         error_message = (
             f"Error fetching library drive: {response.status_code}, {response.text}"
-            if response else "Error fetching library drive: No response received"
+            if response
+            else "Error fetching library drive: No response received"
         )
         raise OneDriveClientException(error_message)
 
@@ -212,13 +226,17 @@ class OneDriveClient(HttpClient):
         server_relative_path = parsed_url.path
 
         url = f"https://graph.microsoft.com/v1.0/sites/{hostname}:{server_relative_path}"
-        headers = {"Authorization": 'Bearer ' + self.access_token}
+        headers = {"Authorization": "Bearer " + self.access_token}
 
+        logging.info(f"Resolving site URL '{site_url}' via Graph API")
         response = requests.get(url, headers=headers)
         if response.status_code == 200:
-            return response.json()['id']
+            site = response.json()
+            site_id = site["id"]
+            logging.info(f"Resolved site ID: {site_id}")
+            return site_id
         raise OneDriveClientException(
-            f"Error occurred when fetching site information: {response.status_code}, {response.text}"
+            f"Error occurred when fetching site information for '{site_url}': {response.status_code}, {response.text}"
         )
 
     def _get_sharepoint_document_libraries(self):
@@ -226,10 +244,9 @@ class OneDriveClient(HttpClient):
         url = f"{self.base_url}/sites/{site_id}/lists"
         response = self.get_request(url, is_absolute_path=True)
         if response.status_code == 200:
-            return response.json()['value']
+            return response.json()["value"]
         raise OneDriveClientException(
-            f"Error occurred when getting SharePoint document libraries: "
-            f"{response.status_code}, {response.text}"
+            f"Error occurred when getting SharePoint document libraries: {response.status_code}, {response.text}"
         )
 
     def get_document_libraries(self, site_url):
@@ -240,17 +257,27 @@ class OneDriveClient(HttpClient):
         try:
             response.raise_for_status()
         except HTTPError as e:
-            raise OneDriveClientException(f"Cannot get document libraries for site_url: {site_url}") from e
-        return response.json()['value']
+            raise OneDriveClientException(
+                f"Cannot get document libraries for site URL '{site_url}': {response.status_code}, {response.text}"
+            ) from e
+        return response.json()["value"]
 
     # ---------------------------------------------------------------- public download API
 
-    def download_files(self, file_path, output_dir, last_modified_at=None,
-                       library_name: str = None, delta_token_url: Optional[str] = None) -> None:
+    def download_files(
+        self,
+        file_path,
+        output_dir,
+        last_modified_at=None,
+        library_name: str = None,
+        delta_token_url: str | None = None,
+    ) -> None:
         folder_path, mask = self._split_path_mask(file_path)
         logging.info(
             "Downloading files matching mask '%s' from folder '%s' (delta_token=%s).",
-            mask, folder_path or "/", "present" if delta_token_url else "absent",
+            mask,
+            folder_path or "/",
+            "present" if delta_token_url else "absent",
         )
 
         if last_modified_at is False:
@@ -322,9 +349,9 @@ class OneDriveClient(HttpClient):
 
     @staticmethod
     def _parse_response(response, endpoint, filename):
-        content_type = response.headers['Content-Type']
+        content_type = response.headers["Content-Type"]
         try:
-            result = response.json() if 'application/json' in content_type else response.text
+            result = response.json() if "application/json" in content_type else response.text
         except requests.exceptions.JSONDecodeError:
             logging.error(f"Unable to parse JSON from response for {filename}.")
             result = response.text
@@ -358,10 +385,8 @@ class OneDriveClient(HttpClient):
         elif response.status_code == 204:
             return None
         elif response.status_code in status_exceptions:
-            raise OneDriveClientException(
-                f'Calling endpoint {endpoint} failed: {result}'
-            ) from status_exceptions[response.status_code]
+            raise OneDriveClientException(f"Calling endpoint {endpoint} failed: {result}") from status_exceptions[
+                response.status_code
+            ]
         else:
-            raise OneDriveClientException(
-                f'Calling endpoint {endpoint} failed: {result}'
-            ) from exceptions.UnknownError
+            raise OneDriveClientException(f"Calling endpoint {endpoint} failed: {result}") from exceptions.UnknownError

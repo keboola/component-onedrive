@@ -17,11 +17,10 @@ import logging
 import os
 import random
 import re
+from collections.abc import Awaitable, Callable
 from datetime import datetime
-from typing import Awaitable, Callable, Optional
 
 import aiohttp
-
 
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 LIST_PAGE_SIZE = 999
@@ -44,8 +43,8 @@ class AsyncDriveEngine:
         scope_folder_path: str,
         mask: str,
         output_dir: str,
-        last_modified_at: Optional[datetime],
-        delta_token_url: Optional[str],
+        last_modified_at: datetime | None,
+        delta_token_url: str | None,
         token_provider: Callable[[bool], Awaitable[str]],
         download_concurrency: int = DEFAULT_DOWNLOAD_CONCURRENCY,
     ) -> None:
@@ -60,9 +59,9 @@ class AsyncDriveEngine:
         self.download_sem = asyncio.Semaphore(download_concurrency)
 
         self.downloaded_files: list[str] = []
-        self.freshest_file_timestamp: Optional[datetime] = None
-        self.new_delta_token_url: Optional[str] = None
-        self._access_token: Optional[str] = None
+        self.freshest_file_timestamp: datetime | None = None
+        self.new_delta_token_url: str | None = None
+        self._access_token: str | None = None
 
     async def run(self) -> None:
         self._access_token = await self.token_provider(False)
@@ -79,13 +78,10 @@ class AsyncDriveEngine:
         elif self.scope_folder_id == "root":
             start_url = f"{GRAPH_BASE}/drives/{self.drive_id}/root/delta?$top={LIST_PAGE_SIZE}"
         else:
-            start_url = (
-                f"{GRAPH_BASE}/drives/{self.drive_id}/items/"
-                f"{self.scope_folder_id}/delta?$top={LIST_PAGE_SIZE}"
-            )
+            start_url = f"{GRAPH_BASE}/drives/{self.drive_id}/items/{self.scope_folder_id}/delta?$top={LIST_PAGE_SIZE}"
 
         pending: list[asyncio.Task] = []
-        next_url: Optional[str] = start_url
+        next_url: str | None = start_url
         seen_pages = 0
         items_seen = 0
         files_queued = 0
@@ -130,7 +126,10 @@ class AsyncDriveEngine:
 
         logging.info(
             "Enumeration done: pages=%s items_seen=%s files_queued=%s downloaded=%s",
-            seen_pages, items_seen, files_queued, len(self.downloaded_files),
+            seen_pages,
+            items_seen,
+            files_queued,
+            len(self.downloaded_files),
         )
 
     @staticmethod
@@ -158,7 +157,7 @@ class AsyncDriveEngine:
             return False
         return all(fnmatch.fnmatchcase(i, m) for i, m in zip(item_parts, mask_parts))
 
-    def _relative_path(self, item: dict) -> Optional[str]:
+    def _relative_path(self, item: dict) -> str | None:
         parent_path = (item.get("parentReference") or {}).get("path", "")
         if ":" in parent_path:
             after = parent_path.split(":", 1)[1].lstrip("/")
@@ -173,11 +172,11 @@ class AsyncDriveEngine:
             return ""
         prefix = self.scope_folder_path + "/"
         if full.startswith(prefix):
-            return full[len(prefix):]
+            return full[len(prefix) :]
         return None
 
     @staticmethod
-    def _parse_last_modified(item: dict) -> Optional[datetime]:
+    def _parse_last_modified(item: dict) -> datetime | None:
         raw = item.get("lastModifiedDateTime")
         if not raw:
             return None
@@ -186,7 +185,7 @@ class AsyncDriveEngine:
         except ValueError:
             return None
 
-    def _update_freshest_timestamp(self, ts: Optional[datetime]) -> None:
+    def _update_freshest_timestamp(self, ts: datetime | None) -> None:
         if ts is None:
             return
         if not self.freshest_file_timestamp or ts > self.freshest_file_timestamp:
@@ -205,8 +204,7 @@ class AsyncDriveEngine:
                     await self._stream_to_file(url, dest, attempt)
                     if filename in self.downloaded_files:
                         logging.warning(
-                            "File %s has the same filename as an already downloaded file. "
-                            "It has been overwritten.",
+                            "File %s has the same filename as an already downloaded file. It has been overwritten.",
                             filename,
                         )
                     self.downloaded_files.append(filename)
@@ -216,7 +214,11 @@ class AsyncDriveEngine:
                     delay = err.retry_after or self._backoff_delay(attempt)
                     logging.warning(
                         "Retryable error downloading %s (attempt %s/%s): %s. Sleeping %.1fs.",
-                        filename, attempt + 1, DEFAULT_RETRIES, err, delay,
+                        filename,
+                        attempt + 1,
+                        DEFAULT_RETRIES,
+                        err,
+                        delay,
                     )
                     await asyncio.sleep(delay)
                 except Exception:
@@ -235,12 +237,11 @@ class AsyncDriveEngine:
                 raise _RetryableDownloadError("401 unauthorized; refreshed token")
             if resp.status in RETRYABLE_STATUSES:
                 raise _RetryableDownloadError(
-                    f"status {resp.status}", retry_after=_parse_retry_after(resp.headers.get("Retry-After")),
+                    f"status {resp.status}",
+                    retry_after=_parse_retry_after(resp.headers.get("Retry-After")),
                 )
             if resp.status != 200:
-                raise AsyncEngineException(
-                    f"Download failed for {url}: status {resp.status}, body {await resp.text()}"
-                )
+                raise AsyncEngineException(f"Download failed for {url}: status {resp.status}, body {await resp.text()}")
             with open(dest, "wb") as f:
                 async for chunk in resp.content.iter_chunked(CHUNK_SIZE):
                     f.write(chunk)
@@ -259,14 +260,16 @@ class AsyncDriveEngine:
                         delay = _parse_retry_after(resp.headers.get("Retry-After")) or self._backoff_delay(attempt)
                         logging.warning(
                             "Retryable %s on %s (attempt %s/%s). Sleeping %.1fs.",
-                            resp.status, url, attempt + 1, DEFAULT_RETRIES, delay,
+                            resp.status,
+                            url,
+                            attempt + 1,
+                            DEFAULT_RETRIES,
+                            delay,
                         )
                         await asyncio.sleep(delay)
                         continue
                     body = await resp.text()
-                    raise AsyncEngineException(
-                        f"Request to {url} failed: status {resp.status}, body {body}"
-                    )
+                    raise AsyncEngineException(f"Request to {url} failed: status {resp.status}, body {body}")
             except aiohttp.ClientError as err:
                 delay = self._backoff_delay(attempt)
                 logging.warning("Network error on %s: %s. Sleeping %.1fs.", url, err, delay)
@@ -275,20 +278,20 @@ class AsyncDriveEngine:
 
     @staticmethod
     def _backoff_delay(attempt: int) -> float:
-        base = min(2 ** attempt, 30)
+        base = min(2**attempt, 30)
         return base + random.uniform(0, 0.5)
 
 
 class _RetryableDownloadError(Exception):
-    def __init__(self, message: str, retry_after: Optional[float] = None) -> None:
+    def __init__(self, message: str, retry_after: float | None = None) -> None:
         super().__init__(message)
         self.retry_after = retry_after
 
 
-def _parse_retry_after(value: Optional[str]) -> Optional[float]:
+def _parse_retry_after(value: str | None) -> float | None:
     if not value:
         return None
     try:
         return float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
