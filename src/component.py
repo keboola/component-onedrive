@@ -1,17 +1,21 @@
+import hashlib
 import json
 import logging
 import os
 from datetime import datetime
-from typing import List, Union, Any
+from typing import Any, List, Optional, Union
 
 from keboola.component.base import ComponentBase, sync_action
 from keboola.component.exceptions import UserException
 from keboola.component.sync_actions import SelectElement
 
 from client.client import OneDriveClient, OneDriveClientException
-from configuration import Configuration, Account
+from configuration import Account, Configuration
 
 KEY_STATE_REFRESH_TOKEN = "#refresh_token"
+KEY_STATE_DELTA = "delta"
+KEY_STATE_DELTA_TOKEN = "token"
+KEY_STATE_DELTA_FINGERPRINT = "fingerprint"
 
 
 class Component(ComponentBase):
@@ -38,17 +42,25 @@ class Component(ComponentBase):
         library_name = self._configuration.account.library_name
 
         last_modified_at = self._set_last_modified(state_file)
+        fingerprint = self._build_delta_fingerprint(file_path, library_name)
+        delta_token_url = self._load_delta_token(state_file, fingerprint)
 
         client = self._get_client(self._configuration.account)
 
         try:
-            client.download_files(file_path=file_path, output_dir=self.files_out_path,
-                                  last_modified_at=last_modified_at, library_name=library_name)
+            client.download_files(
+                file_path=file_path,
+                output_dir=self.files_out_path,
+                last_modified_at=last_modified_at,
+                library_name=library_name,
+                delta_token_url=delta_token_url,
+            )
         except OneDriveClientException as e:
             raise UserException(e) from e
 
         self._create_manifests(client)
         self._save_timestamp(client, file_path)
+        self._save_delta_token(client, fingerprint)
 
     def _save_timestamp(self, client, file_path) -> None:
         if client.freshest_file_timestamp:
@@ -58,8 +70,41 @@ class Component(ComponentBase):
         else:
             logging.warning(f"The component has not found any files matching filename: {file_path}")
 
-    def _create_manifests(self, client) -> None:
+    def _save_delta_token(self, client, fingerprint: str) -> None:
+        token_url = getattr(client, "new_delta_token_url", None)
+        if not token_url:
+            return
+        self._save_to_state({
+            KEY_STATE_DELTA: {
+                KEY_STATE_DELTA_FINGERPRINT: fingerprint,
+                KEY_STATE_DELTA_TOKEN: token_url,
+            }
+        })
+        logging.info("Stored Graph delta token for incremental sync on next run.")
 
+    @staticmethod
+    def _load_delta_token(state_file: dict, fingerprint: str) -> Optional[str]:
+        delta = state_file.get(KEY_STATE_DELTA) or {}
+        if delta.get(KEY_STATE_DELTA_FINGERPRINT) != fingerprint:
+            if delta:
+                logging.info("Delta token fingerprint changed; ignoring stored token.")
+            return None
+        token = delta.get(KEY_STATE_DELTA_TOKEN)
+        if token:
+            logging.info("Resuming enumeration from stored delta token.")
+        return token
+
+    def _build_delta_fingerprint(self, file_path: str, library_name: str) -> str:
+        account = self._configuration.account
+        parts = [
+            account.tenant_id or "",
+            account.site_url or "",
+            library_name or "",
+            file_path or "",
+        ]
+        return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
+
+    def _create_manifests(self, client) -> None:
         tag = self._configuration.destination.custom_tag
         tags = [tag] if tag else []
 
@@ -115,17 +160,17 @@ class Component(ComponentBase):
             {self.configuration.oauth_credentials.id: {KEY_STATE_REFRESH_TOKEN: new_refresh_token}})
 
     def _save_to_state(self, data: dict) -> None:
-        # if not state file exists create it
-        if not os.path.exists(os.path.join(self.configuration.data_dir, 'out', 'state.json')):
-            with open(os.path.join(self.configuration.data_dir, 'out', 'state.json'), 'w+') as state_file:
+        state_path = os.path.join(self.configuration.data_dir, 'out', 'state.json')
+        if not os.path.exists(state_path):
+            with open(state_path, 'w+') as state_file:
                 json.dump(data, state_file)
         else:
-            with open(os.path.join(self.configuration.data_dir, 'out', 'state.json'), 'r+') as state_file:
+            with open(state_path, 'r+') as state_file:
                 actual_data = json.load(state_file)
-                state_file.seek(0)  # Move the cursor to the beginning of the file
+                state_file.seek(0)
                 new_data = {**actual_data, **data}
                 json.dump(new_data, state_file)
-                state_file.truncate()  # Remove remaining part if the new data is shorter
+                state_file.truncate()
 
     @sync_action("listLibraries")
     def list_sharepoint_libraries(self) -> List[SelectElement]:
@@ -148,7 +193,6 @@ class Component(ComponentBase):
         ]
 
 
-# Main entrypoint
 if __name__ == "__main__":
     try:
         comp = Component()
