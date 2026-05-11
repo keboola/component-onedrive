@@ -1,0 +1,1 @@
+https://github.com/keboola/component-onedrive/blob/master/README.md
