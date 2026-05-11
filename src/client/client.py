@@ -4,7 +4,7 @@ import os
 import time
 from datetime import datetime
 from typing import Optional
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 import requests
 from requests.exceptions import HTTPError
@@ -167,7 +167,8 @@ class OneDriveClient(HttpClient):
         normalized = (folder_path or "").strip("/").replace("\\", "/")
         if not normalized:
             return "root"
-        url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root:/{normalized}"
+        encoded = quote(normalized, safe="/")
+        url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root:/{encoded}:/"
         response = self.get_request(url, is_absolute_path=True)
         if response is None:
             raise OneDriveClientException(
