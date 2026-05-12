@@ -10,7 +10,7 @@ concurrency: ci-${{ github.ref }}
 
 jobs:
   ci:
-    uses: keboola/component-ci/.github/workflows/component-pipeline.yml@master
+    uses: keboola/component-ci/.github/workflows/component-pipeline.yml@feature/docker-compose-tests
     with:
       app_id: "kds-team.ex-onedrive"
       vendor: "kds-team"
