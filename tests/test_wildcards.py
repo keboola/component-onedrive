@@ -187,3 +187,60 @@ def test_spaces_in_path_with_slashed_mask():
     # decoding, every file under a space-bearing folder would be dropped.
     downloaded = _run_download("Konfigurátor SB/PODKLADY K CV - pro bankéře/*/*.xlsm")
     assert sorted(downloaded) == ["dluhy.xlsm", "kraťasy.xlsm"]
+
+
+def _run_for_engine(file_path: str, items: list[dict]) -> AsyncDriveEngine:
+    """Drive the engine through one /delta page and return it so the caller can
+    inspect downloaded_files (the on-disk names, post-deduplication)."""
+    folder_path, mask = OneDriveClient._split_path_mask(file_path)
+    scope = folder_path.strip("/")
+
+    async def fake_request_json(self, url):
+        return {"value": items}
+
+    async def fake_stream(self, url, dest, attempt):
+        return None
+
+    async def fake_token(force_refresh):
+        return "token"
+
+    engine = AsyncDriveEngine(
+        drive_id=DRIVE_ID,
+        scope_folder_id="root" if not scope else "scope-id",
+        scope_folder_path=scope,
+        mask=mask,
+        output_dir="/tmp/ignored",
+        last_modified_at=None,
+        delta_token_url=None,
+        token_provider=fake_token,
+    )
+    with (
+        mock.patch.object(AsyncDriveEngine, "_request_json", new=fake_request_json),
+        mock.patch.object(AsyncDriveEngine, "_stream_to_file", new=fake_stream),
+    ):
+        import asyncio
+
+        asyncio.run(engine.run())
+    return engine
+
+
+def test_duplicate_filenames_get_numeric_suffix():
+    # Same file name in two different folders → on-disk we keep both with _2 suffix.
+    items = [
+        _file("report.xlsx", "id_a", f"{ROOT}/data_tests"),
+        _file("report.xlsx", "id_b", f"{ROOT}/Documents"),
+        _file("report.xlsx", "id_c", f"{ROOT}/Pictures"),
+    ]
+    engine = _run_for_engine("report.xlsx", items)
+    assert engine.downloaded_files == ["report.xlsx", "report_2.xlsx", "report_3.xlsx"]
+
+
+def test_item_source_path_decodes_url_encoded_parent():
+    # parentReference.path is URL-encoded by Graph; _item_source_path must decode
+    # it so logs and downstream consumers see the literal path the user typed.
+    engine = _run_for_engine("*.xlsm", [])
+    item = {
+        "name": "kraťasy.xlsm",
+        "parentReference": {"path": quote(STEPA, safe="/:")},
+    }
+    assert engine._item_source_path(item) == "/Konfigurátor SB/PODKLADY K CV - pro bankéře/Stepa Test/kraťasy.xlsm"

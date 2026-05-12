@@ -17,6 +17,7 @@ import logging
 import os
 import random
 import re
+import time
 from collections.abc import Awaitable, Callable
 from datetime import datetime
 from urllib.parse import unquote
@@ -27,7 +28,7 @@ GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 LIST_PAGE_SIZE = 999
 CHUNK_SIZE = 64 * 1024
 DEFAULT_ENUM_CONCURRENCY = 8
-DEFAULT_DOWNLOAD_CONCURRENCY = 8
+DEFAULT_DOWNLOAD_CONCURRENCY = 4
 DEFAULT_RETRIES = 5
 RETRYABLE_STATUSES = (408, 429, 500, 502, 503, 504)
 
@@ -63,6 +64,14 @@ class AsyncDriveEngine:
         self.freshest_file_timestamp: datetime | None = None
         self.new_delta_token_url: str | None = None
         self._access_token: str | None = None
+
+        # Reserved on-disk filenames; collisions get _2, _3 suffixes.
+        self._used_names: set[str] = set()
+        self._name_lock = asyncio.Lock()
+
+        # Shared backoff deadline (monotonic). When one worker is told "Retry-After: N",
+        # every other worker pauses too instead of racing back into the 429 wall.
+        self._global_backoff_until: float = 0.0
 
     async def run(self) -> None:
         self._access_token = await self.token_provider(False)
@@ -195,30 +204,67 @@ class AsyncDriveEngine:
         if not self.freshest_file_timestamp or ts > self.freshest_file_timestamp:
             self.freshest_file_timestamp = ts
 
+    def _item_source_path(self, item: dict) -> str:
+        """Drive-relative source path (folder + filename) of the item, with literal characters."""
+        parent_path = unquote((item.get("parentReference") or {}).get("path", ""))
+        after = parent_path.split(":", 1)[1].lstrip("/") if ":" in parent_path else ""
+        name = item.get("name", "")
+        return f"/{after}/{name}" if after else f"/{name}"
+
+    async def _allocate_unique_name(self, filename: str) -> str:
+        """Reserve a unique on-disk filename. Collisions get an `_2`, `_3`… suffix on the stem."""
+        async with self._name_lock:
+            if filename not in self._used_names:
+                self._used_names.add(filename)
+                return filename
+            stem, ext = os.path.splitext(filename)
+            i = 2
+            while True:
+                candidate = f"{stem}_{i}{ext}"
+                if candidate not in self._used_names:
+                    self._used_names.add(candidate)
+                    return candidate
+                i += 1
+
+    async def _wait_for_global_backoff(self) -> None:
+        delay = self._global_backoff_until - time.monotonic()
+        if delay > 0:
+            await asyncio.sleep(delay)
+
     async def _download_item(self, item: dict) -> None:
-        filename = item["name"]
+        source_name = item["name"]
+        source_path = self._item_source_path(item)
         url = item.get("@microsoft.graph.downloadUrl")
         if not url:
             url = f"{GRAPH_BASE}/drives/{self.drive_id}/items/{item['id']}/content"
 
-        dest = os.path.join(self.output_dir, filename)
+        local_name = await self._allocate_unique_name(source_name)
+        dest = os.path.join(self.output_dir, local_name)
+        renamed = local_name != source_name
         async with self.download_sem:
             for attempt in range(DEFAULT_RETRIES):
                 try:
+                    await self._wait_for_global_backoff()
                     await self._stream_to_file(url, dest, attempt)
-                    if filename in self.downloaded_files:
-                        logging.warning(
-                            "File %s has the same filename as an already downloaded file. It has been overwritten.",
-                            filename,
+                    self.downloaded_files.append(local_name)
+                    if renamed:
+                        logging.info(
+                            "File '%s' downloaded from '%s' (renamed locally to '%s' to avoid collision).",
+                            source_name,
+                            source_path,
+                            local_name,
                         )
-                    self.downloaded_files.append(filename)
-                    logging.info("File %s downloaded.", filename)
+                    else:
+                        logging.info("File '%s' downloaded from '%s'.", source_name, source_path)
                     return
                 except _RetryableDownloadError as err:
                     delay = err.retry_after or self._backoff_delay(attempt)
+                    if err.retry_after:
+                        self._global_backoff_until = max(self._global_backoff_until, time.monotonic() + err.retry_after)
                     logging.warning(
-                        "Retryable error downloading %s (attempt %s/%s): %s. Sleeping %.1fs.",
-                        filename,
+                        "Retryable error downloading '%s' from '%s' (attempt %s/%s): %s. Sleeping %.1fs.",
+                        source_name,
+                        source_path,
                         attempt + 1,
                         DEFAULT_RETRIES,
                         err,
@@ -226,9 +272,9 @@ class AsyncDriveEngine:
                     )
                     await asyncio.sleep(delay)
                 except Exception:
-                    logging.exception("Cannot download file %s.", filename)
+                    logging.exception("Cannot download file '%s' from '%s'.", source_name, source_path)
                     return
-            logging.error("Giving up on %s after %s retries.", filename, DEFAULT_RETRIES)
+            logging.error("Giving up on '%s' from '%s' after %s retries.", source_name, source_path, DEFAULT_RETRIES)
 
     async def _stream_to_file(self, url: str, dest: str, attempt: int) -> None:
         headers = {}
@@ -252,6 +298,7 @@ class AsyncDriveEngine:
 
     async def _request_json(self, url: str) -> dict:
         for attempt in range(DEFAULT_RETRIES):
+            await self._wait_for_global_backoff()
             headers = {"Authorization": f"Bearer {self._access_token}"}
             try:
                 async with self._session.get(url, headers=headers) as resp:
@@ -261,7 +308,10 @@ class AsyncDriveEngine:
                         self._access_token = await self.token_provider(True)
                         continue
                     if resp.status in RETRYABLE_STATUSES:
-                        delay = _parse_retry_after(resp.headers.get("Retry-After")) or self._backoff_delay(attempt)
+                        retry_after = _parse_retry_after(resp.headers.get("Retry-After"))
+                        delay = retry_after or self._backoff_delay(attempt)
+                        if retry_after:
+                            self._global_backoff_until = max(self._global_backoff_until, time.monotonic() + retry_after)
                         logging.warning(
                             "Retryable %s on %s (attempt %s/%s). Sleeping %.1fs.",
                             resp.status,
