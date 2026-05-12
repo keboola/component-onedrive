@@ -17,7 +17,6 @@ import logging
 import os
 import random
 import re
-import time
 from collections.abc import Awaitable, Callable
 from datetime import datetime
 from urllib.parse import unquote
@@ -68,10 +67,6 @@ class AsyncDriveEngine:
         # Reserved on-disk filenames; collisions get _2, _3 suffixes.
         self._used_names: set[str] = set()
         self._name_lock = asyncio.Lock()
-
-        # Shared backoff deadline (monotonic). When one worker is told "Retry-After: N",
-        # every other worker pauses too instead of racing back into the 429 wall.
-        self._global_backoff_until: float = 0.0
 
     async def run(self) -> None:
         self._access_token = await self.token_provider(False)
@@ -226,11 +221,6 @@ class AsyncDriveEngine:
                     return candidate
                 i += 1
 
-    async def _wait_for_global_backoff(self) -> None:
-        delay = self._global_backoff_until - time.monotonic()
-        if delay > 0:
-            await asyncio.sleep(delay)
-
     async def _download_item(self, item: dict) -> None:
         source_name = item["name"]
         source_path = self._item_source_path(item)
@@ -244,7 +234,6 @@ class AsyncDriveEngine:
         async with self.download_sem:
             for attempt in range(DEFAULT_RETRIES):
                 try:
-                    await self._wait_for_global_backoff()
                     await self._stream_to_file(url, dest, attempt)
                     self.downloaded_files.append(local_name)
                     if renamed:
@@ -259,8 +248,6 @@ class AsyncDriveEngine:
                     return
                 except _RetryableDownloadError as err:
                     delay = err.retry_after or self._backoff_delay(attempt)
-                    if err.retry_after:
-                        self._global_backoff_until = max(self._global_backoff_until, time.monotonic() + err.retry_after)
                     logging.warning(
                         "Retryable error downloading '%s' from '%s' (attempt %s/%s): %s. Sleeping %.1fs.",
                         source_name,
@@ -298,7 +285,6 @@ class AsyncDriveEngine:
 
     async def _request_json(self, url: str) -> dict:
         for attempt in range(DEFAULT_RETRIES):
-            await self._wait_for_global_backoff()
             headers = {"Authorization": f"Bearer {self._access_token}"}
             try:
                 async with self._session.get(url, headers=headers) as resp:
@@ -308,10 +294,7 @@ class AsyncDriveEngine:
                         self._access_token = await self.token_provider(True)
                         continue
                     if resp.status in RETRYABLE_STATUSES:
-                        retry_after = _parse_retry_after(resp.headers.get("Retry-After"))
-                        delay = retry_after or self._backoff_delay(attempt)
-                        if retry_after:
-                            self._global_backoff_until = max(self._global_backoff_until, time.monotonic() + retry_after)
+                        delay = _parse_retry_after(resp.headers.get("Retry-After")) or self._backoff_delay(attempt)
                         logging.warning(
                             "Retryable %s on %s (attempt %s/%s). Sleeping %.1fs.",
                             resp.status,
