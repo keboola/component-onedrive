@@ -19,6 +19,7 @@ import random
 import re
 from collections.abc import Awaitable, Callable
 from datetime import datetime
+from urllib.parse import unquote
 
 import aiohttp
 
@@ -163,6 +164,9 @@ class AsyncDriveEngine:
             after = parent_path.split(":", 1)[1].lstrip("/")
         else:
             after = ""
+        # Graph returns parentReference.path URL-encoded (e.g. "My%20Folder").
+        # Decode so the comparison against the literal user-supplied scope_folder_path matches.
+        after = unquote(after)
         name = item.get("name", "")
         full = f"{after}/{name}".strip("/") if after else name
 

@@ -2,11 +2,14 @@
 
 `AsyncDriveEngine._request_json` is patched to return a single fake delta page
 containing the whole subtree (which is how Graph's `/delta` flattens it in
-practice), and `_stream_to_file` is replaced with a recorder. This locks in
-the wildcard semantics of the async download path.
+practice), and `_stream_to_file` is replaced with a recorder. Parent paths in
+the fixtures are URL-encoded just like Graph returns them in production. This
+locks in the wildcard semantics of the async download path, including the
+"folder names with spaces / unicode" case.
 """
 
 from unittest import mock
+from urllib.parse import quote
 
 from client.async_engine import AsyncDriveEngine
 from client.client import OneDriveClient
@@ -21,7 +24,7 @@ def _file(name, item_id, parent_path):
         "file": {},
         "lastModifiedDateTime": "2025-01-01T00:00:00Z",
         "@microsoft.graph.downloadUrl": f"https://example.invalid/{item_id}",
-        "parentReference": {"driveId": DRIVE_ID, "path": parent_path},
+        "parentReference": {"driveId": DRIVE_ID, "path": quote(parent_path, safe="/:")},
     }
 
 
@@ -30,20 +33,25 @@ def _folder(name, item_id, parent_path):
         "name": name,
         "id": item_id,
         "folder": {"childCount": 1},
-        "parentReference": {"driveId": DRIVE_ID, "path": parent_path},
+        "parentReference": {"driveId": DRIVE_ID, "path": quote(parent_path, safe="/:")},
     }
 
 
 ROOT = f"/drives/{DRIVE_ID}/root:"
 MOJE = f"{ROOT}/Moje testovací složka s nabodeníčky"
 INNER = f"{MOJE}/vnořená složka s nabodeníčky"
+SB = f"{ROOT}/Konfigurátor SB"
+PODKLADY = f"{SB}/PODKLADY K CV - pro bankéře"
+STEPA = f"{PODKLADY}/Stepa Test"
 
-# Flat delta enumeration of the whole drive subtree (folders + files).
+# Flat delta enumeration of the whole drive subtree (folders + files). Parent
+# paths in the helpers above get URL-encoded to mirror Graph's actual response.
 ALL_ITEMS = [
     _folder("data_tests", "id_data_tests", ROOT),
     _folder("Documents", "id_documents", ROOT),
     _folder("Moje testovací složka s nabodeníčky", "id_outer", ROOT),
     _folder("Pictures", "id_pictures", ROOT),
+    _folder("Konfigurátor SB", "id_sb", ROOT),
     _file("průvodce.pdf", "id_root_pdf", ROOT),
     _file("zápis.xlsx", "id_root_xlsx", ROOT),
     _file("Book.xlsx", "id_book", f"{ROOT}/data_tests"),
@@ -52,6 +60,11 @@ ALL_ITEMS = [
     _file("tabulka.xlsx", "id_inner_xlsx1", INNER),
     _file("dokument s nabodeníčky.pdf", "id_inner_pdf", INNER),
     _file("zápis s nabodeníčky.xlsx", "id_inner_xlsx2", INNER),
+    _folder("PODKLADY K CV - pro bankéře", "id_podklady", SB),
+    _folder("Stepa Test", "id_stepa", PODKLADY),
+    _file("kraťasy.xlsm", "id_xlsm_a", STEPA),
+    _file("dluhy.xlsm", "id_xlsm_b", STEPA),
+    _file("readme.txt", "id_txt", STEPA),
 ]
 
 
@@ -59,12 +72,13 @@ def _items_under(scope_folder_path: str) -> list[dict]:
     """Items the engine would see when enumerating from a given scope folder.
 
     For root scope, that's everything. For a sub-folder scope, /delta on that
-    folder returns only items within that subtree.
+    folder returns only items within that subtree. Parent paths in fixtures
+    are URL-encoded (matching Graph), so the prefix check encodes too.
     """
     if not scope_folder_path or scope_folder_path == "/":
         return ALL_ITEMS
     normalized = scope_folder_path.strip("/")
-    prefix = f"{ROOT}/{normalized}"
+    prefix = quote(f"{ROOT}/{normalized}", safe="/:")
     return [
         item
         for item in ALL_ITEMS
@@ -157,3 +171,19 @@ def test_leading_slash_is_equivalent_to_no_slash():
     a = _run_download("/Moje testovací složka s nabodeníčky/*/*")
     b = _run_download("Moje testovací složka s nabodeníčky/*/*")
     assert sorted(a) == sorted(b)
+
+
+def test_spaces_in_nested_folder_path_match():
+    # User-reported regression: a deeply nested SharePoint path with spaces,
+    # accents and hyphens. Graph encodes parentReference.path as %20 / %C3%A1 /
+    # etc.; the engine must URL-decode it before comparing to scope_folder_path.
+    downloaded = _run_download("Konfigurátor SB/PODKLADY K CV - pro bankéře/Stepa Test/*.xlsm")
+    assert sorted(downloaded) == ["dluhy.xlsm", "kraťasy.xlsm"]
+
+
+def test_spaces_in_path_with_slashed_mask():
+    # When the mask itself has a slash, _matches_mask falls through to
+    # _relative_path, which has to URL-decode parentReference.path. Without
+    # decoding, every file under a space-bearing folder would be dropped.
+    downloaded = _run_download("Konfigurátor SB/PODKLADY K CV - pro bankéře/*/*.xlsm")
+    assert sorted(downloaded) == ["dluhy.xlsm", "kraťasy.xlsm"]

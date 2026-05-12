@@ -3,7 +3,7 @@ import logging
 import os
 import time
 from datetime import datetime
-from urllib.parse import quote, urlparse
+from urllib.parse import urlparse
 
 import requests
 from keboola.http_client import HttpClient
@@ -182,8 +182,7 @@ class OneDriveClient(HttpClient):
         normalized = (folder_path or "").strip("/").strip()
         if not normalized:
             return "root"
-        encoded = quote(normalized, safe="/")
-        url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root:/{encoded}:/"
+        url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root:/{normalized}:/"
         response = self.get_request(url, is_absolute_path=True)
         if response is None:
             raise OneDriveClientException(f"Cannot find folder '{folder_path}'. Please verify if this path exists.")
