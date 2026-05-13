@@ -3,7 +3,6 @@
 Replaces the previous recursive, folder-by-folder traversal with:
 
 * `/delta` enumeration of the whole subtree in flat pages (`$top=999`)
-* `/search` shortcut when the file mask has a literal prefix
 * `aiohttp`-based concurrent downloads with a bounded semaphore
 * Proactive 401 handling via a refresh callable
 * 429/5xx retry with `Retry-After` honoring
@@ -67,6 +66,8 @@ class AsyncDriveEngine:
         # Reserved on-disk filenames; collisions get _2, _3 suffixes.
         self._used_names: set[str] = set()
         self._name_lock = asyncio.Lock()
+        # Prevents concurrent 401 responses from each triggering an independent refresh.
+        self._token_lock = asyncio.Lock()
 
     async def run(self) -> None:
         self._access_token = await self.token_provider(False)
@@ -260,8 +261,17 @@ class AsyncDriveEngine:
                     await asyncio.sleep(delay)
                 except Exception:
                     logging.exception("Cannot download file '%s' from '%s'.", source_name, source_path)
-                    return
-            logging.error("Giving up on '%s' from '%s' after %s retries.", source_name, source_path, DEFAULT_RETRIES)
+                    raise
+        raise AsyncEngineException(
+            f"Giving up on '{source_name}' from '{source_path}' after {DEFAULT_RETRIES} retries."
+        )
+
+    async def _refresh_token(self, stale_token: str) -> str:
+        """Refresh the access token exactly once even when multiple tasks hit 401 concurrently."""
+        async with self._token_lock:
+            if self._access_token == stale_token:
+                self._access_token = await self.token_provider(True)
+            return self._access_token
 
     async def _stream_to_file(self, url: str, dest: str, attempt: int) -> None:
         headers = {}
@@ -270,7 +280,7 @@ class AsyncDriveEngine:
             headers["Authorization"] = f"Bearer {self._access_token}"
         async with self._session.get(url, headers=headers, allow_redirects=True) as resp:
             if resp.status == 401 and is_graph:
-                self._access_token = await self.token_provider(True)
+                self._access_token = await self._refresh_token(self._access_token)
                 raise _RetryableDownloadError("401 unauthorized; refreshed token")
             if resp.status in RETRYABLE_STATUSES:
                 raise _RetryableDownloadError(
@@ -291,7 +301,7 @@ class AsyncDriveEngine:
                     if resp.status == 200:
                         return await resp.json()
                     if resp.status == 401:
-                        self._access_token = await self.token_provider(True)
+                        self._access_token = await self._refresh_token(self._access_token)
                         continue
                     if resp.status in RETRYABLE_STATUSES:
                         delay = _parse_retry_after(resp.headers.get("Retry-After")) or self._backoff_delay(attempt)
