@@ -100,6 +100,7 @@ class Component(ComponentBase):
     def _build_delta_fingerprint(self, file_path: str, library_name: str) -> str:
         account = self._configuration.account
         parts = [
+            self.configuration.oauth_credentials.id or "",
             account.tenant_id or "",
             account.site_url or "",
             library_name or "",
