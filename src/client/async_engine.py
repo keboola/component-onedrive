@@ -266,7 +266,7 @@ class AsyncDriveEngine:
             f"Giving up on '{source_name}' from '{source_path}' after {DEFAULT_RETRIES} retries."
         )
 
-    async def _refresh_token(self, stale_token: str) -> str:
+    async def _refresh_token(self, stale_token: str | None) -> str | None:
         """Refresh the access token exactly once even when multiple tasks hit 401 concurrently."""
         async with self._token_lock:
             if self._access_token == stale_token:
