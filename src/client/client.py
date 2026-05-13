@@ -253,6 +253,10 @@ class OneDriveClient(HttpClient):
         site_id = self.get_site_id_from_url(site_url)
         url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/drives"
         response = self.get_request(url, is_absolute_path=True)
+        if response is None:
+            raise OneDriveClientException(
+                f"Cannot get document libraries for site URL '{site_url}': endpoint returned 404"
+            )
         try:
             response.raise_for_status()
         except HTTPError as e:

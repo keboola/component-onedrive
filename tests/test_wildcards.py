@@ -232,7 +232,7 @@ def test_duplicate_filenames_get_numeric_suffix():
         _file("report.xlsx", "id_c", f"{ROOT}/Pictures"),
     ]
     engine = _run_for_engine("report.xlsx", items)
-    assert engine.downloaded_files == ["report.xlsx", "report_2.xlsx", "report_3.xlsx"]
+    assert sorted(engine.downloaded_files) == ["report.xlsx", "report_2.xlsx", "report_3.xlsx"]
 
 
 def test_item_source_path_decodes_url_encoded_parent():

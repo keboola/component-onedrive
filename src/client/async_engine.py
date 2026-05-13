@@ -259,6 +259,18 @@ class AsyncDriveEngine:
                         delay,
                     )
                     await asyncio.sleep(delay)
+                except aiohttp.ClientError as err:
+                    delay = self._backoff_delay(attempt)
+                    logging.warning(
+                        "Network error downloading '%s' from '%s' (attempt %s/%s): %s. Sleeping %.1fs.",
+                        source_name,
+                        source_path,
+                        attempt + 1,
+                        DEFAULT_RETRIES,
+                        err,
+                        delay,
+                    )
+                    await asyncio.sleep(delay)
                 except Exception:
                     logging.exception("Cannot download file '%s' from '%s'.", source_name, source_path)
                     raise
