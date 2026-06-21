@@ -3,6 +3,7 @@ name = "component-onedrive"
 version = "0.1.0"
 requires-python = "~=3.14.0"
 dependencies = [
+    "aiohttp>=3.9.5",
     "backoff>=2.2.1",
     "dacite>=1.9.2",
     "keboola-component>=1.4.4",
