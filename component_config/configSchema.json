@@ -1,6 +1,6 @@
 {
   "type": "object",
-  "title": "Account configuration",
+  "title": "Account Configuration",
   "properties": {
     "account": {
       "type": "object",
@@ -9,7 +9,7 @@
       "properties": {
         "account_type": {
           "type": "string",
-          "title": "Account Type",
+          "title": "Account type",
           "enum": [
             "private_onedrive",
             "onedrive_for_business",
@@ -28,7 +28,7 @@
         "tenant_id": {
           "type": "string",
           "title": "Tenant ID",
-          "description": "You can find the Tenant ID in the <a href='https://portal.azure.com/#home'>Azure Portal</a>. After signing in, click on 'Azure Active Directory' in the left-hand menu. The Tenant ID can be found in the 'Tenant information' section on the 'Azure Active Directory' overview page.",
+          "description": "You can find the Tenant ID in the <a href='https://portal.azure.com/#home'>Azure Portal</a>. After signing in, select 'Azure Active Directory' from the left-hand menu. The Tenant ID appears in the 'Tenant information' section on the 'Azure Active Directory' overview page.",
           "options": {
             "dependencies": {
               "account_type": [
@@ -41,8 +41,8 @@
         },
         "site_url": {
           "type": "string",
-          "title": "Site Url",
-          "description": "Enter the URL of the SharePoint site you want to access. The site URL can be found in your browser's address bar when you visit the SharePoint site (e.g., https://your_domain.sharepoint.com/sites/your_site_name). Make sure to include the full URL, including the 'https://' prefix.",
+          "title": "Site URL",
+          "description": "Enter the full URL of the SharePoint site you wish to access. You can find this URL in your browser's address bar when visiting your SharePoint site. Example: https://your_domain.sharepoint.com/sites/your_site_name). Note: Make sure to include the full URL, including the 'https://' prefix.",
           "propertyOrder": 3,
           "options": {
             "dependencies": {
@@ -52,7 +52,7 @@
         },
         "library_name": {
           "type": "string",
-          "title": "Library Name (optional)",
+          "title": "Library name (optional)",
           "description": "Name of the Document Library to download the data from.",
           "propertyOrder": 4,
           "options": {
